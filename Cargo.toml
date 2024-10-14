@@ -1,0 +1,11 @@
+[package]
+name = "gray-mirror-tg"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+dotenv_codegen = "0.15.0"
+grammers-client = { git = "https://github.com/Lonami/grammers" }
+rpassword = "7.3.1"
+tokio = { version = "1.40.0", features = ["macros", "rt", "rt-multi-thread"] }

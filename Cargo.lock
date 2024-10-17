@@ -480,8 +480,10 @@ name = "gray-mirror-tg"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "dotenv_codegen",
  "grammers-client",
+ "quick-impl",
  "rpassword",
  "tokio",
 ]
@@ -832,6 +834,17 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick-impl"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62586aa165565338c4a380f6d2e589f03bd17160a6bce7898b58a9bcc529818a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
 
 [[package]]
 name = "quote"

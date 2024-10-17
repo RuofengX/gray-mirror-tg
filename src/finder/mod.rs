@@ -1,6 +1,10 @@
 use anyhow::{anyhow, Result};
 use grammers_client::{types::Chat, Client};
 
+pub const SEARCH_ENGINE: [i64; 1] = [
+    7048419795, // SOSO机器人
+];
+
 pub struct Finder {
     client: Client,
 }

@@ -1,13 +1,13 @@
 use anyhow::Result;
 use tokio;
 
-mod client;
+pub mod client;
 
 /// 处理增量数据
-mod update;
+pub mod update;
 
 /// 处理存量数据
-mod history;
+pub mod history;
 
 /// 利用soso等机器人挖掘关联群组
 pub mod finder;

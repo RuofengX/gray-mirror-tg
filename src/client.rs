@@ -9,11 +9,15 @@ const API_ID: &str = dotenv!("API_ID");
 const API_HASH: &str = dotenv!("API_HASH");
 const PHONE_NUMBER: &str = dotenv!("PHONE_NUMBER");
 const SESSION_FILE: &str = dotenv!("SESSION_FILE");
+const SOCKS5_PROXY: &str = dotenv!("SOCKS5_PROXY");
 
 pub async fn login_with_dotenv() -> Result<Client> {
     println!("开始连接");
     let mut params: InitParams = Default::default();
-    let _ = params.proxy_url.insert("socks5://localhost:2018".to_string());
+    if SOCKS5_PROXY != ""{
+        println!("使用Socks5代理{}", SOCKS5_PROXY);
+        let _ = params.proxy_url.insert(SOCKS5_PROXY.to_string());
+    }
     let config = Config {
         session: Session::load_file_or_create(SESSION_FILE)?, //
         api_id: API_ID.parse()?,

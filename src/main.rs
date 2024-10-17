@@ -10,7 +10,7 @@ mod update;
 mod history;
 
 /// 利用soso等机器人挖掘关联群组
-mod finder;
+pub mod finder;
 
 
 
@@ -27,6 +27,10 @@ async fn main() -> Result<()> {
         println!("{}, {}", chat.name(), chat.id());
     }
     let a = client.next_update().await;
+
+    let finder: finder::Finder = (&client).into();
+    let soso_bot = finder.find_chat("soso").await?;
+    println!("{:#?}", soso_bot);
 
 
     Ok(())

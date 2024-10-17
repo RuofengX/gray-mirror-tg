@@ -2,7 +2,7 @@ use std::io::{self, BufRead};
 
 use anyhow::{anyhow, Result};
 use dotenv_codegen::dotenv;
-use grammers_client::{session::Session, Client, Config, SignInError};
+use grammers_client::{session::Session, Client, Config, InitParams, SignInError};
 
 // 编译时获取
 const API_ID: &str = dotenv!("API_ID");
@@ -10,14 +10,15 @@ const API_HASH: &str = dotenv!("API_HASH");
 const PHONE_NUMBER: &str = dotenv!("PHONE_NUMBER");
 const SESSION_FILE: &str = dotenv!("SESSION_FILE");
 
-
 pub async fn login_with_dotenv() -> Result<Client> {
     println!("开始连接");
+    let mut params: InitParams = Default::default();
+    let _ = params.proxy_url.insert("socks5://localhost:2018".to_string());
     let config = Config {
         session: Session::load_file_or_create(SESSION_FILE)?, //
         api_id: API_ID.parse()?,
         api_hash: API_HASH.to_string(),
-        params: Default::default(),
+        params,
     };
     let client = grammers_client::Client::connect(config).await?;
     println!("连接成功");

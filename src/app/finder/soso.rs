@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Duration};
+use std::fmt::Display;
 
 use crate::{
     app::{App, Updater},
@@ -25,7 +25,7 @@ pub const SOSO: PackedChat = PackedChat {
 #[derive(Debug, Default)]
 pub struct SosoScraper;
 
-impl Display for SosoScraper{
+impl Display for SosoScraper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("SOSO SCraper")?;
         Ok(())
@@ -33,8 +33,8 @@ impl Display for SosoScraper{
 }
 impl App for SosoScraper {
     async fn ignite(&mut self, context: &mut Context) -> Result<()> {
-        context.client.send_message(SOSO, "/start").await?;
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        // context.client.send_message(SOSO, "/start").await?;
+        // tokio::time::sleep(Duration::from_secs(3)).await;
         context.client.send_message(SOSO, "KK园区").await?;
         // context.client.send_message(SOSO, "KK园区").await?;
         Ok(())

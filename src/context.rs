@@ -30,7 +30,7 @@ impl Context {
             logger.with(tracing_subscriber::fmt::Layer::new()).init();
         } else {
             let (layer, task) = tracing_loki::builder()
-                .label("project", "gray-mirror-tg")?
+                .label("service_name", "gray-mirror-tg")?
                 .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
                 .build_url(Url::parse(&loki_url)?)?;
 

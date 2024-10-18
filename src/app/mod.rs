@@ -101,21 +101,32 @@ pub trait Updater: Send + Sync {
 
 #[derive(Debug, Default)]
 pub struct PrintAll {}
+impl PrintAll{
+    fn filter(msg: &Message) -> bool{
+        !msg.outgoing()
+    }
+}
 
 impl App for PrintAll {}
 
 #[async_trait]
 impl Updater for PrintAll {
     async fn new_message(&mut self, client: &Client, msg: Message) -> Result<()> {
-        let info = serde_json::to_string_pretty(&msg.raw)?;
+        if !Self::filter(&msg){
+            return Ok(())
+        }
+        println!("{}", msg.raw.out);
+        let info = serde_json::to_string_pretty(&msg.raw.message)?;
         let _ = client;
         println!("new msg: {}", info);
         Ok(())
     }
     async fn message_edited(&mut self, client: &Client, msg: Message) -> Result<()> {
-        let info = serde_json::to_string_pretty(&msg.raw)?;
+        if !Self::filter(&msg){
+            return Ok(())
+        }
         let _ = client;
-        println!("msg edit: {}", info);
+        println!("msg edit: {}", msg.raw.message);
         Ok(())
     }
 }

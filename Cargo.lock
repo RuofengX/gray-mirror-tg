@@ -363,7 +363,7 @@ dependencies = [
 [[package]]
 name = "grammers-client"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "chrono",
  "futures-util",
@@ -378,15 +378,13 @@ dependencies = [
  "mime_guess",
  "os_info",
  "pin-project-lite",
- "serde",
- "serde_derive",
  "tokio",
 ]
 
 [[package]]
 name = "grammers-crypto"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "aes",
  "getrandom",
@@ -402,7 +400,7 @@ dependencies = [
 [[package]]
 name = "grammers-mtproto"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "bytes",
  "crc32fast",
@@ -412,15 +410,13 @@ dependencies = [
  "grammers-tl-types",
  "log",
  "num-bigint",
- "serde",
- "serde_derive",
  "sha1",
 ]
 
 [[package]]
 name = "grammers-mtsender"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "bytes",
  "futures-util",
@@ -428,8 +424,6 @@ dependencies = [
  "grammers-mtproto",
  "grammers-tl-types",
  "log",
- "serde",
- "serde_derive",
  "tokio",
  "tokio-socks",
  "trust-dns-resolver",
@@ -439,21 +433,19 @@ dependencies = [
 [[package]]
 name = "grammers-session"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "grammers-crypto",
  "grammers-tl-gen",
  "grammers-tl-parser",
  "grammers-tl-types",
  "log",
- "serde",
- "serde_derive",
 ]
 
 [[package]]
 name = "grammers-tl-gen"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "grammers-tl-parser",
 ]
@@ -461,7 +453,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-parser"
 version = "1.1.2"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "crc32fast",
 ]
@@ -469,7 +461,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-types"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
+source = "git+https://github.com/RuofengX/grammers#b87561ffeee2c4e1d65417066d896afd965c8317"
 dependencies = [
  "grammers-tl-gen",
  "grammers-tl-parser",
@@ -487,8 +479,10 @@ dependencies = [
  "grammers-client",
  "quick-impl",
  "rpassword",
+ "serde",
  "serde_json",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -1261,6 +1255,7 @@ dependencies = [
  "form_urlencoded",
  "idna 0.5.0",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

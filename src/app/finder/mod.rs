@@ -1,15 +1,18 @@
-use crate::{
-    context::Context,
-};
+use std::collections::HashSet;
 
-use super::{App, Updater};
+use crate::context::Context;
+
 use anyhow::{anyhow, Result};
 use grammers_client::{
     session::PackedType,
     types::{Chat, PackedChat},
     Client,
 };
-use soso::ParseSOSO;
+use serde::{Deserialize, Serialize};
+use soso::SosoScraper;
+use url::Url;
+
+use super::{App, Updater};
 
 pub mod soso;
 
@@ -23,7 +26,7 @@ impl App for Finder {
     async fn ignite(&mut self, context: &mut Context) -> Result<()> {
         println!("Finder启动");
         println!("@soso");
-        context.add_app(ParseSOSO::default()).await?;
+        context.add_app(SosoScraper::default()).await?;
         Ok(())
     }
 }
@@ -58,3 +61,31 @@ impl Finder {
         Ok(self.find_chat("soso").await?.pack())
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RelatedLink {
+    pub link: String,
+    pub desc: String,
+}
+impl PartialEq for RelatedLink {
+    fn eq(&self, other: &Self) -> bool {
+        self.link == other.link
+    }
+}
+impl RelatedLink {
+    pub fn new(link: String, desc: String) -> Self {
+        Self { link, desc }
+    }
+}
+
+pub struct TgMsg{
+    // todo
+}
+impl TryFrom<RelatedLink> for TgMsg{
+    type Error = anyhow::Error;
+
+    fn try_from(value: RelatedLink) -> std::result::Result<Self, Self::Error> {
+        todo!()
+    }
+}
+

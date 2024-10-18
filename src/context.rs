@@ -52,28 +52,33 @@ impl Context {
     }
 
     pub async fn add_app(&mut self, mut app: impl App + 'static) -> Result<()> {
-        info!("add app > {}", app);
-        trace!("running ignite > {}", app);
+        info!("[应用]{} > 注册", app);
+        trace!("[应用]{} > 初始化", app);
         app.ignite(self).await?;
-        trace!("auto add app's updater > {}", app);
+        trace!("[应用]{} > 自动注册更新器", app);
         self.add_updater(app);
         Ok(())
     }
 
     pub fn add_updater(&mut self, updater: impl Updater + 'static) -> () {
-        info!("add updater > {}", updater);
+        info!("[更新器]{} > 注册", updater);
         let recv = self.update_sender.subscribe();
         let parser = UpdateRuntime::new(recv, self.client.clone(), Box::new(updater));
         self.update_parser.push(parser);
     }
 
     pub fn add_background_task<T: BackgroundTask + 'static>(&mut self, mut task: T) -> () {
-        info!("[background]{} > start", task);
-        let bg_span = info_span!("background");
         let client = self.client.clone();
         self.background_tasks.spawn(async move {
-            if let Err(e) = task.start(client).instrument(bg_span).await {
-                error!("[background]{task} > end with error >> {e}");
+            let bg_span = info_span!(concat!("后台-", const_random!(u32)));
+            if let Err(e) = async {
+                info!("{} > 启动", task);
+                task.start(client).await
+            }
+            .instrument(bg_span)
+            .await
+            {
+                error!("{task} > 报错退出 >> {e}");
             };
         });
     }
@@ -82,9 +87,10 @@ impl Context {
         let mut tasks = tokio::task::JoinSet::new();
 
         for mut i in self.update_parser {
-            let update_span = info_span!(concat!("update-parser-", const_random!(u64)));
+            let update_span = info_span!(concat!("更新器-", const_random!(u32)));
             tasks.spawn(
                 async move {
+                    info!("{} > 启动", i);
                     i.update_daemon().await;
                 }
                 .instrument(update_span),

@@ -99,6 +99,12 @@ pub struct UpdateRuntime {
     method: Box<dyn Updater>,
 }
 
+impl Display for UpdateRuntime{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.method.fmt(f)
+    }
+}
+
 impl AsRef<Client> for UpdateRuntime {
     fn as_ref(&self) -> &Client {
         &self.client

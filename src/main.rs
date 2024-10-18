@@ -1,18 +1,14 @@
 use anyhow::Result;
+use context::Context;
 use tokio;
 
 pub mod client;
 
-/// 处理增量数据
-pub mod update;
-
 /// 处理存量数据
 pub mod history;
 
-/// 利用soso等机器人挖掘关联群组
-pub mod finder;
-
-
+pub mod app;
+pub mod context;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -21,17 +17,11 @@ async fn main() -> Result<()> {
     // 获取客户端
     let client = client::login_with_dotenv().await?;
 
-    let mut dialogs = client.iter_dialogs();
-    while let Some(d) = dialogs.next().await? {
-        let chat = d.chat();
-        println!("{}, {}", chat.name(), chat.id());
-    }
-    let a = client.next_update().await;
+    let mut context = Context::new(client.clone()).await?;
 
-    let finder: finder::Finder = (&client).into();
-    let soso_bot = finder.find_chat("soso").await?;
-    println!("{:#?}", soso_bot);
+    context.add_app(app::finder::Finder::new(client.clone())).await?;
 
+    context.run().await?;
 
     Ok(())
 }

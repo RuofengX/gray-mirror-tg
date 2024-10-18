@@ -363,8 +363,7 @@ dependencies = [
 [[package]]
 name = "grammers-client"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85c97c2ce2ade23eb00a35d192929a678bd5b1650c7f36eea8a7f0ecd2c79c33"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "chrono",
  "futures-util",
@@ -379,14 +378,15 @@ dependencies = [
  "mime_guess",
  "os_info",
  "pin-project-lite",
+ "serde",
+ "serde_derive",
  "tokio",
 ]
 
 [[package]]
 name = "grammers-crypto"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17c75ce8d715d407a5767a94b5fd7b210106ec5c29c7be8ff4dfdca58de4dcf6"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "aes",
  "getrandom",
@@ -402,8 +402,7 @@ dependencies = [
 [[package]]
 name = "grammers-mtproto"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d057562ccd5ac7437683534634e469875db27827a7febd42cb6b775ffd01dff"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "bytes",
  "crc32fast",
@@ -413,14 +412,15 @@ dependencies = [
  "grammers-tl-types",
  "log",
  "num-bigint",
+ "serde",
+ "serde_derive",
  "sha1",
 ]
 
 [[package]]
 name = "grammers-mtsender"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b077919dbbacab7644f8479f0c4456625714313334986b4f7c812691aac96a"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "bytes",
  "futures-util",
@@ -428,6 +428,8 @@ dependencies = [
  "grammers-mtproto",
  "grammers-tl-types",
  "log",
+ "serde",
+ "serde_derive",
  "tokio",
  "tokio-socks",
  "trust-dns-resolver",
@@ -437,21 +439,21 @@ dependencies = [
 [[package]]
 name = "grammers-session"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03d5fea440a79a78d0d68b57f062d737a0aed0decee813bf3c232252f3b3f7da"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "grammers-crypto",
  "grammers-tl-gen",
  "grammers-tl-parser",
  "grammers-tl-types",
  "log",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
 name = "grammers-tl-gen"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c214cadfba8cd8ef9368bdf273f56f688537b0310ea42f91fc746f4fd59b70b9"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "grammers-tl-parser",
 ]
@@ -459,8 +461,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-parser"
 version = "1.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee695382f42bbeba75c08311785b208d7efa8ded80b33ae387157b07ee21267b"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "crc32fast",
 ]
@@ -468,11 +469,12 @@ dependencies = [
 [[package]]
 name = "grammers-tl-types"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49566409a69e4ff3340c1b6f392e5754c89fa1ea43be4584ac8ee74c1eb0643a"
+source = "git+https://github.com/RuofengX/grammers#7f2ba9efe209d1eda55aba49c2d0aa2408866e55"
 dependencies = [
  "grammers-tl-gen",
  "grammers-tl-parser",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -485,6 +487,7 @@ dependencies = [
  "grammers-client",
  "quick-impl",
  "rpassword",
+ "serde_json",
  "tokio",
 ]
 
@@ -591,6 +594,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddc24109865250148c2e0f3d25d4f0f479571723792d3802153c60922a4fb708"
 
 [[package]]
+name = "itoa"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+
+[[package]]
 name = "js-sys"
 version = "0.3.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -601,9 +610,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.159"
+version = "0.2.161"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
+checksum = "8e9489c2807c139ffd9c1794f4af0ebe86a828db53ecdc7fea2111d0fed085d1"
 
 [[package]]
 name = "linked-hash-map"
@@ -822,9 +831,9 @@ checksum = "dc375e1527247fe1a97d8b7156678dfe7c1af2fc075c9a4db3690ecd2a148068"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.87"
+version = "1.0.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3e4daa0dcf6feba26f985457cdf104d4b4256fc5a09547140f3631bb076b19a"
+checksum = "7c3a7fc5db1e57d5a779a352c8cdb57b29aa4c40cc69c3a68a7fedc815fbf2f9"
 dependencies = [
  "unicode-ident",
 ]
@@ -932,10 +941,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "719b953e2095829ee67db738b3bfa9fa368c94900df327b3f07fe6e794d2fe1f"
 
 [[package]]
+name = "ryu"
+version = "1.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "serde"
+version = "1.0.210"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8e3592472072e6e22e0a54d5904d9febf8508f65fb8552499a1abc7d1078c3a"
+dependencies = [
+ "serde_derive",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.210"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.129"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dbcf9b78a125ee667ae19388837dd12294b858d101fdd393cb9d5501ef09eb2"
+dependencies = [
+ "itoa",
+ "memchr",
+ "ryu",
+ "serde",
+]
 
 [[package]]
 name = "sha1"

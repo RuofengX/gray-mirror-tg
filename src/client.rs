@@ -3,6 +3,7 @@ use std::io::{self, BufRead};
 use anyhow::{anyhow, Result};
 use dotenv_codegen::dotenv;
 use grammers_client::{session::Session, Client, Config, InitParams, SignInError};
+use tracing::{info, warn};
 
 // 编译时获取
 const API_ID: &str = dotenv!("API_ID");
@@ -12,10 +13,10 @@ const SESSION_FILE: &str = dotenv!("SESSION_FILE");
 const SOCKS5_PROXY: &str = dotenv!("SOCKS5_PROXY");
 
 pub async fn login_with_dotenv() -> Result<Client> {
-    println!("开始连接");
+    info!("开始连接");
     let mut params: InitParams = Default::default();
     if SOCKS5_PROXY != ""{
-        println!("使用Socks5代理{}", SOCKS5_PROXY);
+        info!("使用Socks5代理{}", SOCKS5_PROXY);
         let _ = params.proxy_url.insert(SOCKS5_PROXY.to_string());
     }
     let config = Config {
@@ -25,28 +26,28 @@ pub async fn login_with_dotenv() -> Result<Client> {
         params,
     };
     let client = grammers_client::Client::connect(config).await?;
-    println!("连接成功");
+    info!("连接成功");
 
     if !client.is_authorized().await? {
-        println!("会话未登陆");
+        warn!("会话未登陆");
 
-        println!("使用账号{}", PHONE_NUMBER);
+        info!("使用账号{}", PHONE_NUMBER);
         let token = client.request_login_code(PHONE_NUMBER).await?;
-        println!("请查看TG并输入验证码，回车结束");
+        info!("请查看TG并输入验证码，回车结束");
         let code = io::stdin()
             .lock()
             .lines()
             .next()
             .ok_or(anyhow!("cannot iter stdin"))??;
 
-        println!("开始登陆");
+        info!("开始登陆");
         let signed_in = client.sign_in(&token, &code).await;
 
         match signed_in {
             Err(SignInError::PasswordRequired(password_token)) => {
-                println!("此次登陆需要密码");
+                warn!("此次登陆需要密码");
                 if let Some(hint) = password_token.hint() {
-                    println!("密码提示：{}", hint)
+                    info!("密码提示：{}", hint)
                 }
                 let password = rpassword::prompt_password(
                     "请输入密码，回车结束（出于安全考虑，密码不会显示）",
@@ -60,10 +61,10 @@ pub async fn login_with_dotenv() -> Result<Client> {
             _ => (),
         };
 
-        println!("登陆成功");
+        info!("登陆成功");
         client.session().save_to_file(SESSION_FILE)?;
-        println!("会话已保存");
+        info!("会话已保存");
     }
-    println!("会话已登陆");
+    info!("会话已登陆");
     Ok(client)
 }

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{fmt::Display, time::Duration};
 
 use crate::{
     app::{App, Updater},
@@ -12,6 +12,7 @@ use grammers_client::{
     types::{Message, PackedChat},
     Client,
 };
+use tracing::debug;
 
 use super::RelatedLink;
 
@@ -24,6 +25,12 @@ pub const SOSO: PackedChat = PackedChat {
 #[derive(Debug, Default)]
 pub struct SosoScraper;
 
+impl Display for SosoScraper{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SOSO SCraper")?;
+        Ok(())
+    }
+}
 impl App for SosoScraper {
     async fn ignite(&mut self, context: &mut Context) -> Result<()> {
         context.client.send_message(SOSO, "/start").await?;
@@ -43,8 +50,9 @@ impl Updater for SosoScraper {
         let mut rtn = Vec::new();
         SosoScraper::extract_link(&msg, &mut rtn)?;
 
-        println!("{:#?}", rtn);
+        debug!("{:#?}", rtn);
         // TODO
+
         let _ = client;
         Ok(())
     }
@@ -60,7 +68,6 @@ impl SosoScraper {
         msg.chat().id() == SOSO.id && !msg.outgoing() && msg.text().contains("关键词：")
     }
 
-    /// Fail if url is mellformed
     fn extract_link(msg: &Message, writer: &mut Vec<RelatedLink>) -> Result<()> {
         let words: Vec<u16> = msg.raw.message.encode_utf16().collect();
 

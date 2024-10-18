@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{fmt::Display, future::Future};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -7,13 +7,17 @@ use grammers_client::{
     Client, Update,
 };
 use tokio::sync::broadcast::{self, Receiver};
+use tracing::error;
 
 use crate::context::Context;
+
+/// 简单的范用应用
+pub mod generic;
 
 /// 利用soso等机器人挖掘关联群组
 pub mod finder;
 
-pub trait App: Updater + Send + Sync {
+pub trait App: Updater + Display + Send + Sync {
     /// 初始化数据
     fn ignite(&mut self, context: &mut Context) -> impl Future<Output = Result<()>> {
         let _ = context;
@@ -23,20 +27,7 @@ pub trait App: Updater + Send + Sync {
 
 /// 匹配器，以供部分实现
 #[async_trait]
-pub trait Updater: Send + Sync {
-    /// Do before every update
-    async fn before(&mut self, client: &Client, update: &Update) -> Result<()> {
-        let _ = (client, update);
-        Ok(())
-    }
-
-    /// Do after every update
-    async fn after(&mut self, client: &Client) -> Result<()> {
-        let _ = client;
-        Ok(())
-    }
-
-
+pub trait Updater: Display + Send + Sync {
     /// Occurs whenever a new text message or a message with media is produced.
     async fn new_message(&mut self, client: &Client, msg: Message) -> Result<()> {
         let _ = (client, msg);
@@ -80,54 +71,25 @@ pub trait Updater: Send + Sync {
     }
 
     /// Return Ok(Some(())) if parsed; return Ok(None) if not parsed
-    async fn parse_update(&mut self, client: &Client, update: Update) -> Result<()> {
-        self.before(client, &update).await?;
-        match update {
-            Update::NewMessage(msg) => self.new_message(client, msg).await?,
-            Update::MessageEdited(msg) => self.message_edited(client, msg).await?,
-            Update::MessageDeleted(msg_del) => self.message_deletion(client, msg_del).await?,
-            Update::CallbackQuery(callback_query) => {
-                self.callback_query(client, callback_query).await?
+    async fn parse_update(&mut self, client: &Client, update: Update) -> () {
+        let result: anyhow::Result<()> = {
+            match update {
+                Update::NewMessage(msg) => self.new_message(client, msg).await,
+                Update::MessageEdited(msg) => self.message_edited(client, msg).await,
+                Update::MessageDeleted(msg_del) => self.message_deletion(client, msg_del).await,
+                Update::CallbackQuery(callback_query) => {
+                    self.callback_query(client, callback_query).await
+                }
+                Update::InlineQuery(inline_query) => self.inline_query(client, inline_query).await,
+                Update::InlineSend(inline_send) => self.inline_send(client, inline_send).await,
+                Update::Raw(_) =>Ok(()),
+                _ => Ok(()),
             }
-            Update::InlineQuery(inline_query) => self.inline_query(client, inline_query).await?,
-            Update::InlineSend(inline_send) => self.inline_send(client, inline_send).await?,
-            Update::Raw(_) => (),
-            _ => (),
         };
-        self.after(client).await?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct PrintAll {}
-impl PrintAll{
-    fn filter(msg: &Message) -> bool{
-        !msg.outgoing()
-    }
-}
-
-impl App for PrintAll {}
-
-#[async_trait]
-impl Updater for PrintAll {
-    async fn new_message(&mut self, client: &Client, msg: Message) -> Result<()> {
-        if !Self::filter(&msg){
-            return Ok(())
-        }
-        println!("{}", msg.raw.out);
-        let info = serde_json::to_string_pretty(&msg.raw.message)?;
-        let _ = client;
-        println!("new msg: {}", info);
-        Ok(())
-    }
-    async fn message_edited(&mut self, client: &Client, msg: Message) -> Result<()> {
-        if !Self::filter(&msg){
-            return Ok(())
-        }
-        let _ = client;
-        println!("msg edit: {}", msg.raw.message);
-        Ok(())
+        if let Err(e) = result{
+            error!("{} parse update error > {e}", &self as &dyn Display);
+            return
+        };
     }
 }
 
@@ -156,10 +118,14 @@ impl UpdateRuntime {
         }
     }
 
-    pub async fn update_daemon(&mut self) -> Result<()> {
+    pub async fn update_daemon(&mut self) -> () {
         while let Ok(update) = self.recv.recv().await {
-            self.method.parse_update(&self.client, update).await?;
+            self.method.parse_update(&self.client, update).await;
         }
-        Ok(())
     }
 }
+
+pub trait BackgroundTask: Display + Send + Sync {
+    fn name() -> &'static str;
+    fn start(&mut self, client: Client) -> impl Future<Output = Result<()>> + Send;  // No error handling
+} 

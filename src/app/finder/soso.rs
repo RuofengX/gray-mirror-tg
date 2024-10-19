@@ -12,7 +12,7 @@ use grammers_client::{
     types::{Message, PackedChat},
     Client,
 };
-use tracing::debug;
+use tracing::{info_span, warn, warn_span};
 
 use super::RelatedLink;
 
@@ -27,7 +27,7 @@ pub struct SosoScraper;
 
 impl Display for SosoScraper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("SOSO SCraper")?;
+        f.write_str("SOSO Scraper")?;
         Ok(())
     }
 }
@@ -44,13 +44,20 @@ impl App for SosoScraper {
 #[async_trait]
 impl Updater for SosoScraper {
     async fn new_message(&mut self, client: &Client, msg: Message) -> Result<()> {
+        let new_span = info_span!("处理新消息");
+        let _span = new_span.enter();
+
         if !Self::filter(&msg) {
             return Ok(());
         }
         let mut rtn = Vec::new();
         SosoScraper::extract_link(&msg, &mut rtn)?;
 
-        debug!("{:#?}", rtn);
+        for i in rtn {
+            let fetch_span = warn_span!("发现关联链接");
+            let _span = fetch_span.enter();
+            warn!(stage = "数据发现", "{}", i);
+        }
         // TODO
 
         let _ = client;
@@ -86,7 +93,6 @@ impl SosoScraper {
                     _ => (),
                 }
             }
-            println!("{:?}", writer);
         }
         Ok(())
     }

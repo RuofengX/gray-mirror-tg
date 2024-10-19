@@ -14,7 +14,7 @@ impl PrintAll {
     }
 }
 
-impl Display for PrintAll{
+impl Display for PrintAll {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Print All")?;
         Ok(())

@@ -82,13 +82,13 @@ pub trait Updater: Display + Send + Sync {
                 }
                 Update::InlineQuery(inline_query) => self.inline_query(client, inline_query).await,
                 Update::InlineSend(inline_send) => self.inline_send(client, inline_send).await,
-                Update::Raw(_) =>Ok(()),
+                Update::Raw(_) => Ok(()),
                 _ => Ok(()),
             }
         };
-        if let Err(e) = result{
+        if let Err(e) = result {
             error!("{} parse update error > {e}", &self as &dyn Display);
-            return
+            return;
         };
     }
 }
@@ -99,9 +99,11 @@ pub struct UpdateRuntime {
     method: Box<dyn Updater>,
 }
 
-impl Display for UpdateRuntime{
+impl Display for UpdateRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.method.fmt(f)
+        self.method.fmt(f)?;
+        write!(f, " >> 运行时")?;
+        Ok(())
     }
 }
 
@@ -124,14 +126,15 @@ impl UpdateRuntime {
         }
     }
 
-    pub async fn update_daemon(&mut self) -> () {
+    pub async fn run(mut self) -> Result<()> {
         while let Ok(update) = self.recv.recv().await {
             self.method.parse_update(&self.client, update).await;
         }
+        Ok(())
     }
 }
 
 pub trait BackgroundTask: Display + Send + Sync {
     fn name() -> &'static str;
-    fn start(&mut self, client: Client) -> impl Future<Output = Result<()>> + Send;  // No error handling
-} 
+    fn start(&mut self, client: Client) -> impl Future<Output = Result<()>> + Send; // No error handling
+}

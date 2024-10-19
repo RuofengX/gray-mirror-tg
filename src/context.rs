@@ -1,23 +1,23 @@
+use std::future::Future;
+
 use anyhow::Result;
-use const_random::const_random;
 use dotenv_codegen::dotenv;
 use grammers_client::{Client, Update};
 use tokio::{
     sync::broadcast::{self, Sender},
     task::JoinSet,
 };
-use tracing::{error, info, info_span, trace, Instrument};
+use tracing::{info, info_span, trace, Instrument};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 
-use crate::app::{App, BackgroundTask, UpdateRuntime, Updater};
+use crate::app::{App, UpdateRuntime, Updater};
 
 pub struct Context {
     pub client: Client,
-    update_parser: Vec<UpdateRuntime>,
     update_sender: Sender<Update>,
-    background_tasks: JoinSet<()>,
+    background_tasks: JoinSet<Result<()>>,
 }
 impl Context {
     pub async fn new() -> Result<Self> {
@@ -34,7 +34,10 @@ impl Context {
                 .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
                 .build_url(Url::parse(&loki_url)?)?;
 
-            background_tasks.spawn(task);
+            background_tasks.spawn(async move {
+                task.await;
+                Ok(()) // map () -> Result(())
+            });
             logger
                 .with(layer)
                 .with(tracing_subscriber::fmt::Layer::new())
@@ -43,7 +46,6 @@ impl Context {
 
         let rtn = Self {
             client: crate::client::login_with_dotenv().await?,
-            update_parser: Vec::new(),
             update_sender: s,
             background_tasks,
         };
@@ -52,69 +54,71 @@ impl Context {
     }
 
     pub async fn add_app(&mut self, mut app: impl App + 'static) -> Result<()> {
-        info!("[应用]{} > 注册", app);
-        trace!("[应用]{} > 初始化", app);
+        let name = format!("{}", app);
+        let update_span = info_span!("应用", name);
+        let _span = update_span.enter();
+
+        trace!("初始化(ignite)");
         app.ignite(self).await?;
-        trace!("[应用]{} > 自动注册更新器", app);
+        trace!("自动注册更新器");
         self.add_updater(app);
         Ok(())
     }
 
     pub fn add_updater(&mut self, updater: impl Updater + 'static) -> () {
-        info!("[更新器]{} > 注册", updater);
+        let name = format!("{}", &updater);
+        let update_span = info_span!("更新器", name);
+
         let recv = self.update_sender.subscribe();
-        let parser = UpdateRuntime::new(recv, self.client.clone(), Box::new(updater));
-        self.update_parser.push(parser);
+        let runtime = UpdateRuntime::new(recv, self.client.clone(), Box::new(updater));
+
+        self.add_background_task(
+            &format!("{}", runtime),
+            async move {
+                info!("{} > 启动", &runtime);
+                runtime.run().await
+            }
+            .instrument(update_span),
+        );
     }
 
-    pub fn add_background_task<T: BackgroundTask + 'static>(&mut self, mut task: T) -> () {
-        let client = self.client.clone();
-        self.background_tasks.spawn(async move {
-            let bg_span = info_span!(concat!("后台-", const_random!(u32)));
-            if let Err(e) = async {
-                info!("{} > 启动", task);
-                task.start(client).await
+    pub fn add_background_task(
+        &mut self,
+        name: &str,
+        task: impl Future<Output = Result<()>> + Send + 'static,
+    ) -> () {
+        let bg_span = info_span!("后台任务", name);
+
+        self.background_tasks.spawn(
+            async move {
+                info!("启动");
+                task.await
             }
-            .instrument(bg_span)
-            .await
-            {
-                error!("{task} > 报错退出 >> {e}");
-            };
+            .instrument(bg_span),
+        );
+    }
+
+    pub fn start_listen_updates(&mut self) -> () {
+        let client = self.client.clone();
+        let sender = self.update_sender.clone();
+
+        self.add_background_task("更新监听", async move {
+            loop {
+                let update = client.next_update().await?;
+                trace!("发送");
+                sender.send(update)?;
+            }
         });
     }
 
-    pub async fn run(self) -> Result<()> {
-        let mut tasks = tokio::task::JoinSet::new();
+    /// Run until error occurs. Return first error.
+    pub async fn run(mut self) -> Result<()> {
+        let main_span = info_span!("主进程");
+        let _span = main_span.enter();
 
-        for mut i in self.update_parser {
-            let update_span = info_span!(concat!("更新器-", const_random!(u32)));
-            tasks.spawn(
-                async move {
-                    info!("{} > 启动", i);
-                    i.update_daemon().await;
-                }
-                .instrument(update_span),
-            );
+        while let Some(result) = self.background_tasks.join_next().await {
+            result??;
         }
-        let sender_span = info_span!("udpate-sender");
-        tasks.spawn(
-            async move {
-                loop {
-                    if let Err(e) = Self::update_send(&self.client, &self.update_sender).await {
-                        error!("end with error >> {e}")
-                    };
-                }
-            }
-            .instrument(sender_span),
-        );
-        tasks.join_all().await;
-        Ok(())
-    }
-
-    async fn update_send(client: &Client, sender: &Sender<Update>) -> Result<()> {
-        let update = client.next_update().await?;
-        trace!("received new update");
-        sender.send(update)?;
         Ok(())
     }
 }

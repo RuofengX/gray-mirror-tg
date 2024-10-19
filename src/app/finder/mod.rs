@@ -22,7 +22,7 @@ pub struct Finder {
     client: Client,
 }
 
-impl Display for Finder{
+impl Display for Finder {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         f.write_str("Finder")?;
         Ok(())
@@ -82,7 +82,12 @@ impl RelatedLink {
         Self { link, desc }
     }
 }
+impl Display for RelatedLink {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.desc.fmt(f)
+    }
+}
 
-pub struct TgMsg{
+pub struct TgMsg {
     // todo
 }

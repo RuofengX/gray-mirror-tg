@@ -3,7 +3,7 @@ use std::io::{self, BufRead};
 use anyhow::{anyhow, Result};
 use dotenv_codegen::dotenv;
 use grammers_client::{session::Session, Client, Config, InitParams, SignInError};
-use tracing::{info, warn};
+use tracing::{info, info_span, warn};
 
 // 编译时获取
 const API_ID: &str = dotenv!("API_ID");
@@ -13,9 +13,12 @@ const SESSION_FILE: &str = dotenv!("SESSION_FILE");
 const SOCKS5_PROXY: &str = dotenv!("SOCKS5_PROXY");
 
 pub async fn login_with_dotenv() -> Result<Client> {
+    let login_span = info_span!("客户端登陆");
+    let _span = login_span.enter();
+
     info!("开始连接");
     let mut params: InitParams = Default::default();
-    if SOCKS5_PROXY != ""{
+    if SOCKS5_PROXY != "" {
         info!("使用Socks5代理{}", SOCKS5_PROXY);
         let _ = params.proxy_url.insert(SOCKS5_PROXY.to_string());
     }

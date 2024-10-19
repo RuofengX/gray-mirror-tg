@@ -122,9 +122,9 @@ checksum = "428d9aa8fbc0670b7b8d6030a7fadd0f86151cae55e4dbbece15f3780a3dfaf3"
 
 [[package]]
 name = "cc"
-version = "1.1.30"
+version = "1.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b16803a61b81d9eabb7eae2588776c4c1e584b738ede45fdbb4c972cec1e9945"
+checksum = "c2e7962b54006dcfcc61cb72735f4d89bb97061dd6a7ed882ec6b8ee53714c6f"
 dependencies = [
  "shlex",
 ]
@@ -442,7 +442,7 @@ dependencies = [
 [[package]]
 name = "grammers-client"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "chrono",
  "futures-util",
@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "grammers-crypto"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "aes",
  "getrandom",
@@ -479,7 +479,7 @@ dependencies = [
 [[package]]
 name = "grammers-mtproto"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "bytes",
  "crc32fast",
@@ -495,7 +495,7 @@ dependencies = [
 [[package]]
 name = "grammers-mtsender"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "bytes",
  "futures-util",
@@ -512,7 +512,7 @@ dependencies = [
 [[package]]
 name = "grammers-session"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "grammers-crypto",
  "grammers-tl-gen",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-gen"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "grammers-tl-parser",
 ]
@@ -532,7 +532,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-parser"
 version = "1.1.2"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "crc32fast",
 ]
@@ -540,7 +540,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-types"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#4d840cc03d6b5780affb7e1c79e19242459d942a"
+source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
 dependencies = [
  "grammers-tl-gen",
  "grammers-tl-parser",
@@ -1400,9 +1400,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.129"
+version = "1.0.131"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbcf9b78a125ee667ae19388837dd12294b858d101fdd393cb9d5501ef09eb2"
+checksum = "67d42a0bd4ac281beff598909bb56a86acaf979b84483e1c79c10dcaf98f8cf3"
 dependencies = [
  "itoa",
  "memchr",
@@ -1819,12 +1819,9 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "unicase"
-version = "2.7.0"
+version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7d2d4dafb69621809a81864c9c1b864479e1235c0dd4e199924b9742439ed89"
-dependencies = [
- "version_check",
-]
+checksum = "7e51b68083f157f853b6379db119d1c1be0e6e4dec98101079dec41f6f5cf6df"
 
 [[package]]
 name = "unicode-bidi"

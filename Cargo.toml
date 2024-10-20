@@ -11,6 +11,7 @@ dotenv_codegen = "0.15.0"
 # grammers-client = { version = "0.7.0", features = ["proxy"] }
 grammers-client = {git = "https://github.com/Lonami/grammers", features = ["proxy", "serde"]}
 quick-impl = "0.1.4"
+ron = "0.8.1"
 rpassword = "7.3.1"
 serde = {version = "1.0.210", features = ["derive"]}
 serde_json = "1.0.129"

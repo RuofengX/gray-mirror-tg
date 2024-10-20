@@ -2,17 +2,14 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::{types::Message, Client};
+use grammers_client::Client;
+
+use crate::types::MirrorMessage;
 
 use super::{App, Updater};
 
 #[derive(Debug, Default)]
 pub struct PrintAll {}
-impl PrintAll {
-    fn filter(msg: &Message) -> bool {
-        !msg.outgoing()
-    }
-}
 
 impl Display for PrintAll {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -25,22 +22,13 @@ impl App for PrintAll {}
 
 #[async_trait]
 impl Updater for PrintAll {
-    async fn new_message(&mut self, client: &Client, msg: Message) -> Result<()> {
-        if !Self::filter(&msg) {
-            return Ok(());
-        }
-        println!("{}", msg.raw.out);
-        let info = serde_json::to_string_pretty(&msg.raw.message)?;
-        let _ = client;
-        println!("new msg: {}", info);
+    async fn message_recv(&mut self, _client: &Client, msg: MirrorMessage) -> Result<()> {
+        let info = ron::to_string(&msg)?;
+        println!("接收到新消息: {}", info);
         Ok(())
     }
-    async fn message_edited(&mut self, client: &Client, msg: Message) -> Result<()> {
-        if !Self::filter(&msg) {
-            return Ok(());
-        }
-        let _ = client;
-        println!("msg edit: {}", msg.raw.message);
+    async fn message_edited(&mut self, _client: &Client, msg: MirrorMessage) -> Result<()> {
+        println!("msg edit: {}", ron::to_string(&msg)?);
         Ok(())
     }
 }

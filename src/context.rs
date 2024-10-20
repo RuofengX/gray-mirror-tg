@@ -45,7 +45,7 @@ impl Context {
         }
 
         let rtn = Self {
-            client: crate::client::login_with_dotenv().await?,
+            client: crate::login::login_with_dotenv().await?,
             update_sender: s,
             background_tasks,
         };

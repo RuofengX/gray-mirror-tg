@@ -8,7 +8,6 @@ use grammers_client::{
     types::{Chat, PackedChat},
     Client,
 };
-use serde::{Deserialize, Serialize};
 use soso::SosoScraper;
 
 use super::{App, Updater};
@@ -65,29 +64,4 @@ impl Finder {
     pub async fn get_soso(&mut self) -> Result<PackedChat> {
         Ok(self.find_chat("soso").await?.pack())
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RelatedLink {
-    pub link: String,
-    pub desc: String,
-}
-impl PartialEq for RelatedLink {
-    fn eq(&self, other: &Self) -> bool {
-        self.link == other.link
-    }
-}
-impl RelatedLink {
-    pub fn new(link: String, desc: String) -> Self {
-        Self { link, desc }
-    }
-}
-impl Display for RelatedLink {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.desc.fmt(f)
-    }
-}
-
-pub struct TgMsg {
-    // todo
 }

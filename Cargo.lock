@@ -57,7 +57,7 @@ checksum = "721cae7de5c34fbb2acd27e21e6d2cf7b886dce0c27388d46c4e6c47ea4318dd"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -299,7 +299,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -442,7 +442,7 @@ dependencies = [
 [[package]]
 name = "grammers-client"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "chrono",
  "futures-util",
@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "grammers-crypto"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "aes",
  "getrandom",
@@ -479,7 +479,7 @@ dependencies = [
 [[package]]
 name = "grammers-mtproto"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "bytes",
  "crc32fast",
@@ -495,7 +495,7 @@ dependencies = [
 [[package]]
 name = "grammers-mtsender"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "bytes",
  "futures-util",
@@ -512,7 +512,7 @@ dependencies = [
 [[package]]
 name = "grammers-session"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "grammers-crypto",
  "grammers-tl-gen",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-gen"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "grammers-tl-parser",
 ]
@@ -532,7 +532,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-parser"
 version = "1.1.2"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "crc32fast",
 ]
@@ -540,7 +540,7 @@ dependencies = [
 [[package]]
 name = "grammers-tl-types"
 version = "0.7.0"
-source = "git+https://github.com/RuofengX/grammers#fa9f2adc021ca3e57deae7e33031706e6694ac16"
+source = "git+https://github.com/Lonami/grammers#8997a2dadc64b9ee7ee4d03b2f6eaba15d44f00c"
 dependencies = [
  "grammers-tl-gen",
  "grammers-tl-parser",
@@ -1006,7 +1006,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -1144,7 +1144,7 @@ dependencies = [
  "itertools",
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -1170,7 +1170,7 @@ checksum = "62586aa165565338c4a380f6d2e589f03bd17160a6bce7898b58a9bcc529818a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -1395,14 +1395,14 @@ checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
 name = "serde_json"
-version = "1.0.131"
+version = "1.0.132"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67d42a0bd4ac281beff598909bb56a86acaf979b84483e1c79c10dcaf98f8cf3"
+checksum = "d726bfaff4b320266d395898905d0eba0345aae23b54aee3a737e260fd46db03"
 dependencies = [
  "itoa",
  "memchr",
@@ -1509,9 +1509,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.79"
+version = "2.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89132cd0bf050864e1d38dc3bbc07a0eb8e7530af26344d3d2bbbef83499f590"
+checksum = "198514704ca887dd5a1e408c6c6cdcba43672f9b4062e1b24aa34e74e6d7faae"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1557,7 +1557,7 @@ checksum = "08904e7672f5eb876eaaf87e0ce17857500934f4981c4a0ab2b4aa98baac7fc3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -1618,7 +1618,7 @@ checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -1679,7 +1679,7 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]
 
 [[package]]
@@ -1911,7 +1911,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
  "wasm-bindgen-shared",
 ]
 
@@ -1945,7 +1945,7 @@ checksum = "26c6ab57572f7a24a4985830b120de1594465e5d500f24afe89e16b4e833ef68"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -2209,5 +2209,5 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.79",
+ "syn 2.0.81",
 ]

@@ -9,7 +9,7 @@ async-trait = "0.1.83"
 const-random = "0.1.18"
 dotenv_codegen = "0.15.0"
 # grammers-client = { version = "0.7.0", features = ["proxy"] }
-grammers-client = {git = "https://github.com/RuofengX/grammers", features = ["proxy", "serde"]}
+grammers-client = {git = "https://github.com/Lonami/grammers", features = ["proxy", "serde"]}
 quick-impl = "0.1.4"
 rpassword = "7.3.1"
 serde = {version = "1.0.210", features = ["derive"]}

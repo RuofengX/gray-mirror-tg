@@ -47,7 +47,7 @@ impl Updater for SosoScraper {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
 
-        if !Self::filter(&msg) {
+        if !Self::fliter(&msg) {
             return Ok(());
         }
         let mut rtn = Vec::new();
@@ -71,7 +71,7 @@ impl Updater for SosoScraper {
 }
 
 impl SosoScraper {
-    fn filter(msg: &Message) -> bool {
+    fn fliter(msg: &Message) -> bool {
         msg.chat().id() == SOSO.id && !msg.outgoing() && msg.text().contains("关键词：")
     }
 

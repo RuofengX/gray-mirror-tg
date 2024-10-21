@@ -10,7 +10,7 @@ use tokio::{
     },
     task::JoinSet,
 };
-use tracing::{info, info_span, trace, Instrument};
+use tracing::{info, info_span, level_filters::STATIC_MAX_LEVEL, trace, Instrument};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
@@ -45,9 +45,12 @@ impl Context {
 
         let logger = tracing_subscriber::registry();
         let loki_url = dotenv!("LOKI_URL");
-        if loki_url == "" {
-            logger.with(tracing_subscriber::fmt::Layer::new()).init();
-        } else {
+
+        let logger = logger
+            .with(STATIC_MAX_LEVEL)
+            .with(tracing_subscriber::fmt::Layer::new());
+
+        if loki_url != "" {
             let (layer, task) = tracing_loki::builder()
                 .label("service_name", "gray-mirror-tg")?
                 .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
@@ -57,10 +60,9 @@ impl Context {
                 task.await;
                 Ok(()) // map () -> Result(())
             });
-            logger
-                .with(layer)
-                .with(tracing_subscriber::fmt::Layer::new())
-                .init();
+            logger.with(layer).init();
+        } else {
+            logger.init();
         }
 
         let rtn = Self(Arc::new(ContextInner {

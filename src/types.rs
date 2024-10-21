@@ -113,11 +113,12 @@ impl MirrorMessage {
         &self,
         client: &Client,
         button: &KeyboardButtonCallback,
+        delay: Duration,
     ) -> Result<()> {
         let click_button_span = info_span!("点击反馈按钮");
         let _span = click_button_span.enter();
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(delay).await;
         info!("{}", button.text);
         client
             .invoke(&GetBotCallbackAnswer {

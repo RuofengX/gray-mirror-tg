@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Duration};
 
 use crate::{
     app::{App, Updater},
@@ -8,7 +8,7 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{session::PackedType, types::PackedChat};
-use tracing::info_span;
+use tracing::{info, info_span};
 
 pub const SOSO: PackedChat = PackedChat {
     ty: PackedType::Bot,
@@ -45,18 +45,22 @@ impl Updater for SosoScraper {
 
         let links = msg.extract_links(&self);
         for link in links {
-            context
-                .persist
-                .push("search", link.into())
-                .await;
+            let data = link.into();
+            if !context.persist.contain("search", &data).await? {
+                info!("发送至存储");
+                context.persist.push("search", data).await;
+            } else{
+                info!("已存储");
+            }
         }
 
         let buttons = msg.extract_inline_buttons();
         for btn in buttons {
             if btn.text.contains("下一页") || btn.text.contains("➡️") {
-                msg.click_callback_buttons(&context.client, &btn)
-                    .await
-                    .unwrap_err(); // 搜搜机器人不会有返回值，而是直接修改消息内容
+                let _ = msg
+                    .click_callback_buttons(&context.client, &btn, Duration::from_secs(1))
+                    .await;
+                // 搜搜机器人不会有返回值，而是直接修改消息内容，直接忽略
             }
         }
 

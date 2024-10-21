@@ -75,11 +75,11 @@ impl Persist for HTTP {
         }
 
         let text = resp.text().await?;
-        if text == "true".to_string() {
+        if text.contains("true") {
             return Ok(true);
         }
 
-        if text == "false".to_string() {
+        if text.contains("false") {
             return Ok(false);
         }
 

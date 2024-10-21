@@ -47,10 +47,11 @@ impl Updater for SosoScraper {
     async fn message_recv(&mut self, _client: &Client, msg: MirrorMessage) -> Result<()> {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
-        // TODO
 
         msg.extract_links(Source::search("KK园区"));
-        msg.extract_inline_buttoms();
+        msg.extract_inline_buttons();
+
+        // TODO
 
         Ok(())
     }

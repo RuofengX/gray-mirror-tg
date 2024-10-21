@@ -71,13 +71,11 @@ impl MirrorMessage {
         rtn
     }
 
-    pub fn extract_inline_buttoms(&self) -> Vec<KeyboardButtonCallback> {
+    pub fn extract_inline_buttons(&self) -> Vec<KeyboardButtonCallback> {
         let fetch_button_span = info_span!("提取反馈按钮");
         let _span = fetch_button_span.enter();
 
         let reply_markup = &self.raw.reply_markup;
-
-        debug!("{}", ron::to_string(reply_markup).unwrap());
 
         let mut rtn = Vec::new();
         if let Some(tl::enums::ReplyMarkup::ReplyInlineMarkup(markup)) = reply_markup {

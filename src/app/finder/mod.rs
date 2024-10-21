@@ -41,27 +41,4 @@ impl Finder {
     pub fn new(client: Client) -> Self {
         Self { client }
     }
-
-    pub async fn find_chat(&self, username: &str) -> Result<Chat> {
-        let rtn = self
-            .client
-            .resolve_username(username)
-            .await?
-            .ok_or(anyhow!("未能找到用户: {}", username))?;
-        Ok(rtn)
-    }
-
-    pub async fn join_bot(&self, id: i64) -> Result<PackedChat> {
-        let chat = PackedChat {
-            ty: PackedType::Bot,
-            id,
-            access_hash: None,
-        };
-        self.client.send_message(chat, "/start").await?;
-        Ok(chat)
-    }
-
-    pub async fn get_soso(&mut self) -> Result<PackedChat> {
-        Ok(self.find_chat("soso").await?.pack())
-    }
 }

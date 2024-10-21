@@ -159,7 +159,7 @@ pub trait Updater: Display + Send + Sync {
         }
 
         if let Some(word) = self.filter_word() {
-            if !raw_msg.text().contains(word) {
+            if !raw_msg.text().contains(&word) {
                 flag = false
             }
         }
@@ -175,7 +175,7 @@ pub trait Updater: Display + Send + Sync {
         None
     }
 
-    fn filter_word(&self) -> Option<&str> {
+    fn filter_word(&self) -> Option<String> {
         None
     }
 

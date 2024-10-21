@@ -16,9 +16,7 @@ async fn main() -> Result<()> {
 
     let mut context = Context::new().await?;
 
-    context
-        .add_app(app::finder::Finder::new(context.client.clone()))
-        .await?;
+    context.add_app(app::finder::Finder::new()).await?;
 
     context.start_listen_updates();
     context.run().await?;

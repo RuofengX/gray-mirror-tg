@@ -1,21 +1,14 @@
-use std::{fmt::Display, time::Duration};
+use std::fmt::Display;
 
 use crate::{
     app::{App, Updater},
     context::Context,
-    types::{MirrorMessage, Source},
+    types::MirrorMessage,
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::{
-    grammers_tl_types::{
-        enums::InputPeer, functions::messages::GetBotCallbackAnswer, types::InputPeerChat,
-    },
-    session::PackedType,
-    types::{Message, PackedChat},
-    Client,
-};
-use tracing::{debug, info_span};
+use grammers_client::{session::PackedType, types::PackedChat, Client};
+use tracing::info_span;
 
 pub const SOSO: PackedChat = PackedChat {
     ty: PackedType::Bot,
@@ -23,12 +16,14 @@ pub const SOSO: PackedChat = PackedChat {
     access_hash: Some(7758671014432728719),
 };
 
-#[derive(Debug, Default)]
-pub struct SosoScraper;
+#[derive(Debug)]
+pub struct SosoScraper {
+    pub keyword: &'static str,
+}
 
 impl Display for SosoScraper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("SOSO Scraper")?;
+        f.write_str(&format!("SOSO爬虫-{}", self.keyword))?;
         Ok(())
     }
 }
@@ -36,7 +31,7 @@ impl App for SosoScraper {
     async fn ignite(&mut self, context: &mut Context) -> Result<()> {
         // context.client.send_message(SOSO, "/start").await?;
         // tokio::time::sleep(Duration::from_secs(3)).await;
-        context.client.send_message(SOSO, "KK园区").await?;
+        context.client.send_message(SOSO, self.keyword).await?;
         // context.client.send_message(SOSO, "KK园区").await?;
         Ok(())
     }
@@ -44,12 +39,17 @@ impl App for SosoScraper {
 
 #[async_trait]
 impl Updater for SosoScraper {
-    async fn message_recv(&mut self, _client: &Client, msg: MirrorMessage) -> Result<()> {
+    async fn message_recv(&mut self, client: &Client, msg: MirrorMessage) -> Result<()> {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
 
-        msg.extract_links(Source::search("KK园区"));
-        msg.extract_inline_buttons();
+        msg.extract_links(&self);
+        let buttons = msg.extract_inline_buttons();
+        for btn in buttons {
+            if btn.text.contains("下一页") || btn.text.contains("➡️") {
+                msg.click_callback_buttons(client, &btn).await?;
+            }
+        }
 
         // TODO
 
@@ -69,27 +69,13 @@ impl Updater for SosoScraper {
         Some(&[SOSO.id])
     }
 
-    fn filter_word(&self) -> Option<&str> {
-        Some("关键词：")
+    fn filter_word(&self) -> Option<String> {
+        Some(format!("关键词：{}", self.keyword))
     }
 }
 
 impl SosoScraper {
-    pub async fn press_next_page_buttom(&self, client: &Client, msg: &Message) -> Result<()> {
-        tokio::time::sleep(Duration::from_secs(8)).await;
-        let a = client
-            .invoke(&GetBotCallbackAnswer {
-                game: false,
-                peer: InputPeer::Chat(InputPeerChat {
-                    chat_id: msg.chat().id(),
-                }),
-                msg_id: msg.id(),
-                data: None, // TODO
-                password: None,
-            })
-            .await?;
-        debug!("{:?}", a);
-
-        Ok(())
+    pub fn new(keyword: &'static str) -> Self {
+        Self { keyword }
     }
 }

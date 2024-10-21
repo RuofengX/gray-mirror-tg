@@ -29,10 +29,7 @@ impl Display for SosoScraper {
 }
 impl App for SosoScraper {
     async fn ignite(&mut self, context: Context) -> Result<()> {
-        // context.client.send_message(SOSO, "/start").await?;
-        // tokio::time::sleep(Duration::from_secs(3)).await;
         context.client.send_message(SOSO, self.keyword).await?;
-        // context.client.send_message(SOSO, "KK园区").await?;
         Ok(())
     }
 }

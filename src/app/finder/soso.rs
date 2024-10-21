@@ -4,7 +4,7 @@ use crate::{app::Updater, context::Context, types::MirrorMessage};
 use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{session::PackedType, types::PackedChat};
-use tracing::{info, info_span};
+use tracing::{debug, info, info_span};
 
 pub const SOSO: PackedChat = PackedChat {
     ty: PackedType::Bot,
@@ -37,7 +37,7 @@ impl Updater for SosoScraper {
                 info!("发送至存储");
                 context.persist.push("search", data).await;
             } else {
-                info!("已存储");
+                debug!("已存储");
             }
         }
 

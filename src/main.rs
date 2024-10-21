@@ -15,9 +15,10 @@ async fn main() -> Result<()> {
 
     let mut context = Context::new().await?;
 
+    context.start_listen_updates().await;
+
     context.add_app(app::finder::Finder::new()).await?;
 
-    context.start_listen_updates().await;
     context.run().await?;
 
     Ok(())

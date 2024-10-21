@@ -3,13 +3,13 @@ use std::{fmt::Display, future::Future};
 use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{
-    types::{CallbackQuery, InlineQuery, InlineSend, Message, MessageDeletion},
+    types::{CallbackQuery, InlineQuery, InlineSend, Message as RawMessage, MessageDeletion},
     Client, Update,
 };
 use tokio::sync::broadcast::{self, Receiver};
 use tracing::{error, info_span, trace};
 
-use crate::{context::Context, types::MirrorMessage};
+use crate::{context::Context, types::Message };
 
 /// 简单的范用应用
 pub mod generic;
@@ -28,12 +28,12 @@ pub trait App: Updater + Display + Send + Sync {
 #[async_trait]
 pub trait Updater: Display + Send + Sync {
     /// Occurs whenever a new text message or a message with media is produced.
-    async fn message_recv(&mut self, _context: Context, _msg: MirrorMessage) -> Result<()> {
+    async fn message_recv(&mut self, _context: Context, _msg: Message) -> Result<()> {
         Ok(())
     }
 
     /// Occurs when a message is updated.
-    async fn message_edited(&mut self, _context: Context, _msg: MirrorMessage) -> Result<()> {
+    async fn message_edited(&mut self, _context: Context, _msg: Message) -> Result<()> {
         Ok(())
     }
 
@@ -142,7 +142,7 @@ pub trait Updater: Display + Send + Sync {
     ///
     /// * return true this message will get parsed later;
     /// * return false will ignore this message
-    fn raw_msg_filter(&self, raw_msg: &Message) -> bool {
+    fn raw_msg_filter(&self, raw_msg: &RawMessage) -> bool {
         let mut flag = true;
 
         if self.filter_incoming() {

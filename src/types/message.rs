@@ -9,43 +9,20 @@ use grammers_client::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{info, info_span, warn};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum MirrorData{
-    Message(MirrorMessage),
-    Link(RelatedLink),
-}
-impl MirrorData{
-    pub const fn ty(&self) -> &'static str{
-        match self{
-            MirrorData::Message(_) => "新消息",
-            MirrorData::Link(_) => "链接",
-        }
-    }
-}
-impl From<MirrorMessage> for MirrorData{
-    fn from(value: MirrorMessage) -> Self {
-        MirrorData::Message(value)
-    }
-}
-
-impl From<RelatedLink> for MirrorData{
-    fn from(value: RelatedLink) -> Self {
-        MirrorData::Link(value)
-    }
-}
+use super::link;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MirrorMessage {
+pub struct Model {
     raw: tl::types::Message,
     input_peer: InputPeer,
 }
-impl Display for MirrorMessage {
+impl Display for Model {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.raw.message.fmt(f)
     }
 }
 
-impl From<&grammers_client::types::Message> for MirrorMessage {
+impl From<&grammers_client::types::Message> for Model {
     fn from(value: &grammers_client::types::Message) -> Self {
         Self {
             raw: value.raw.clone(),
@@ -53,8 +30,8 @@ impl From<&grammers_client::types::Message> for MirrorMessage {
         }
     }
 }
-impl MirrorMessage {
-    pub fn extract_links(&self, source: &impl Source) -> Vec<RelatedLink> {
+impl Model {
+    pub fn extract_links(&self, source: &impl Display) -> Vec<link::Model> {
         let fetch_span = info_span!("提取消息内文本链接");
         let _span = fetch_span.enter();
 
@@ -72,7 +49,7 @@ impl MirrorMessage {
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
                             info!(stage = "数据发现", "{}", desc);
-                            rtn.push(RelatedLink::new(link, desc, &source));
+                            rtn.push(link::Model::new(link, desc, &source));
                         } else {
                             warn!("提取链接时错误 >> offset: {offset}; len: {len}");
                         }
@@ -130,34 +107,5 @@ impl MirrorMessage {
             })
             .await?;
         Ok(())
-    }
-}
-
-pub trait Source: Display {}
-impl<T: Display> Source for T {}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RelatedLink {
-    pub link: String,
-    pub desc: String,
-    pub source: String,
-}
-impl PartialEq for RelatedLink {
-    fn eq(&self, other: &Self) -> bool {
-        self.link == other.link
-    }
-}
-impl Display for RelatedLink {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.desc.fmt(f)
-    }
-}
-impl RelatedLink {
-    pub fn new(link: String, desc: String, source: &impl Source) -> Self {
-        Self {
-            link,
-            desc,
-            source: format!("{}", source),
-        }
     }
 }

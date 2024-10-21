@@ -1,6 +1,6 @@
 use std::{fmt::Display, time::Duration};
 
-use crate::{app::Updater, context::Context, types::MirrorMessage};
+use crate::{app::Updater, context::Context, types::Message};
 use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{session::PackedType, types::PackedChat};
@@ -26,7 +26,7 @@ impl Display for SosoScraper {
 
 #[async_trait]
 impl Updater for SosoScraper {
-    async fn message_recv(&mut self, context: Context, msg: MirrorMessage) -> Result<()> {
+    async fn message_recv(&mut self, context: Context, msg: Message) -> Result<()> {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
 
@@ -56,7 +56,7 @@ impl Updater for SosoScraper {
         Ok(())
     }
 
-    async fn message_edited(&mut self, client: Context, msg: MirrorMessage) -> Result<()> {
+    async fn message_edited(&mut self, client: Context, msg: Message) -> Result<()> {
         self.message_recv(client, msg).await?;
         Ok(())
     }

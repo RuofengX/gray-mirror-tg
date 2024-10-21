@@ -4,12 +4,12 @@ use reqwest::StatusCode;
 use tracing::{debug, error, info_span};
 use url::Url;
 
-use crate::types::MirrorData;
+use crate::types::GenericData;
 
 #[async_trait]
 pub trait Persist: Sync + Send {
-    async fn push(&self, collection: &str, data: MirrorData) -> ();
-    async fn contain(&self, collection: &str, data: &MirrorData) -> Result<bool>;
+    async fn push(&self, collection: &str, data: GenericData) -> ();
+    async fn contain(&self, collection: &str, data: &GenericData) -> Result<bool>;
 }
 
 pub struct HTTP {
@@ -31,7 +31,7 @@ impl HTTP {
 #[async_trait]
 impl Persist for HTTP {
     /// `/tg/{collection}/push`
-    async fn push(&self, collection: &str, data: MirrorData) -> () {
+    async fn push(&self, collection: &str, data: GenericData) -> () {
         let push_span = info_span!("投递");
         let _span = push_span.enter();
 
@@ -58,7 +58,7 @@ impl Persist for HTTP {
     }
 
     /// `/tg/{collection}/contain`
-    async fn contain(&self, collection: &str, data: &MirrorData) -> Result<bool> {
+    async fn contain(&self, collection: &str, data: &GenericData) -> Result<bool> {
         let contain_span = info_span!("查重");
         let _span = contain_span.enter();
         let url = HTTP::get_url(&collection, "contain");

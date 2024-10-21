@@ -27,6 +27,7 @@ impl Database {
     }
 
     pub async fn put_message(&self, data: message::ActiveModel) -> Result<message::Model> {
+        // TODO: 使用msg的uuid去重
         let span = info_span!("提交消息");
         let _span = span.enter();
 

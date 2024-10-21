@@ -23,7 +23,7 @@ pub struct SosoScraper {
 
 impl Display for SosoScraper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("SOSO爬虫-{}", self.keyword))?;
+        f.write_str(&format!("SOSO_{}", self.keyword))?;
         Ok(())
     }
 }
@@ -44,6 +44,13 @@ impl Updater for SosoScraper {
         let _span = new_span.enter();
 
         let links = msg.extract_links(&self);
+        for link in links {
+            context
+                .persist
+                .push("search", link.into())
+                .await;
+        }
+
         let buttons = msg.extract_inline_buttons();
         for btn in buttons {
             if btn.text.contains("下一页") || btn.text.contains("➡️") {
@@ -53,12 +60,6 @@ impl Updater for SosoScraper {
             }
         }
 
-        for link in links {
-            context
-                .persist
-                .push(&format!("{}", &self), link.into())
-                .await;
-        }
         // TODO
 
         Ok(())

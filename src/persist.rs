@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use reqwest::StatusCode;
-use tracing::{error, info_span};
+use tracing::{debug, error, info_span};
 use url::Url;
 
 use crate::types::MirrorData;
@@ -23,11 +23,8 @@ impl HTTP {
             client: reqwest::Client::new(),
         }
     }
-    pub fn base_url() -> Url {
-        Url::parse(Self::BASE)
-            .expect("PERSIST_URL 解析错误")
-            .join("tg")
-            .unwrap()
+    pub fn get_url(collection: &str, operation: &str) -> Url {
+        Url::parse(&format!("{}/tg/{collection}/{operation}", HTTP::BASE)).unwrap()
     }
 }
 
@@ -38,13 +35,10 @@ impl Persist for HTTP {
         let push_span = info_span!("投递");
         let _span = push_span.enter();
 
-        let url = HTTP::base_url()
-            .join(collection)
-            .unwrap()
-            .join("push")
-            .unwrap();
+        let url = HTTP::get_url(&collection, "push");
+        debug!("{}", url);
 
-        let req = self.client.post(url);
+        let req = self.client.put(url);
         let resp = req
             .header("User-Agent", HTTP::UA)
             .body(serde_json::to_string(&data).unwrap())
@@ -67,7 +61,7 @@ impl Persist for HTTP {
     async fn contain(&self, collection: &str, data: &MirrorData) -> Result<bool> {
         let contain_span = info_span!("查重");
         let _span = contain_span.enter();
-        let url = HTTP::base_url().join(collection)?.join("push")?;
+        let url = HTTP::get_url(&collection, "contain");
 
         let req = self.client.post(url);
         let resp = req

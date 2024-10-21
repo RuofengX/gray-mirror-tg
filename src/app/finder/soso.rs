@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::{session::PackedType, types::PackedChat, Client};
+use grammers_client::{session::PackedType, types::PackedChat};
 use tracing::info_span;
 
 pub const SOSO: PackedChat = PackedChat {
@@ -28,7 +28,7 @@ impl Display for SosoScraper {
     }
 }
 impl App for SosoScraper {
-    async fn ignite(&mut self, context: &mut Context) -> Result<()> {
+    async fn ignite(&mut self, context: Context) -> Result<()> {
         // context.client.send_message(SOSO, "/start").await?;
         // tokio::time::sleep(Duration::from_secs(3)).await;
         context.client.send_message(SOSO, self.keyword).await?;
@@ -39,24 +39,32 @@ impl App for SosoScraper {
 
 #[async_trait]
 impl Updater for SosoScraper {
-    async fn message_recv(&mut self, client: &Client, msg: MirrorMessage) -> Result<()> {
+    async fn message_recv(&mut self, context: Context, msg: MirrorMessage) -> Result<()> {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
 
-        msg.extract_links(&self);
+        let links = msg.extract_links(&self);
         let buttons = msg.extract_inline_buttons();
         for btn in buttons {
             if btn.text.contains("下一页") || btn.text.contains("➡️") {
-                msg.click_callback_buttons(client, &btn).await?;
+                msg.click_callback_buttons(&context.client, &btn)
+                    .await
+                    .unwrap_err(); // 搜搜机器人不会有返回值，而是直接修改消息内容
             }
         }
 
+        for link in links {
+            context
+                .persist
+                .push(&format!("{}", &self), link.into())
+                .await;
+        }
         // TODO
 
         Ok(())
     }
 
-    async fn message_edited(&mut self, client: &Client, msg: MirrorMessage) -> Result<()> {
+    async fn message_edited(&mut self, client: Context, msg: MirrorMessage) -> Result<()> {
         self.message_recv(client, msg).await?;
         Ok(())
     }

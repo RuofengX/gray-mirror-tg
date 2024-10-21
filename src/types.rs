@@ -10,6 +10,31 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, info_span, warn};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum MirrorData{
+    Message(MirrorMessage),
+    Link(RelatedLink),
+}
+impl MirrorData{
+    pub const fn ty(&self) -> &'static str{
+        match self{
+            MirrorData::Message(_) => "新消息",
+            MirrorData::Link(_) => "链接",
+        }
+    }
+}
+impl From<MirrorMessage> for MirrorData{
+    fn from(value: MirrorMessage) -> Self {
+        MirrorData::Message(value)
+    }
+}
+
+impl From<RelatedLink> for MirrorData{
+    fn from(value: RelatedLink) -> Self {
+        MirrorData::Link(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MirrorMessage {
     raw: tl::types::Message,
     input_peer: InputPeer,

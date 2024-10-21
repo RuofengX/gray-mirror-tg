@@ -1,10 +1,13 @@
-use std::future::Future;
+use std::{future::Future, ops::Deref, sync::Arc};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
 use grammers_client::{Client, Update};
 use tokio::{
-    sync::broadcast::{self, Sender},
+    sync::{
+        broadcast::{self, Sender},
+        Mutex,
+    },
     task::JoinSet,
 };
 use tracing::{info, info_span, trace, Instrument};
@@ -12,13 +15,29 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use url::Url;
 
-use crate::app::{App, UpdateRuntime, Updater};
+use crate::{
+    app::{App, UpdateRuntime, Updater},
+    persist::{Persist, HTTP},
+};
 
-pub struct Context {
+pub struct ContextInner {
     pub client: Client,
+    pub persist: Arc<dyn Persist>,
+    background_tasks: Mutex<JoinSet<Result<()>>>,
     update_sender: Sender<Update>,
-    background_tasks: JoinSet<Result<()>>,
 }
+
+#[derive(Clone)]
+pub struct Context(Arc<ContextInner>);
+
+impl Deref for Context {
+    type Target = ContextInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl Context {
     pub async fn new() -> Result<Self> {
         let (s, _r) = broadcast::channel(1024);
@@ -44,33 +63,34 @@ impl Context {
                 .init();
         }
 
-        let rtn = Self {
+        let rtn = Self(Arc::new(ContextInner {
             client: crate::login::login_with_dotenv().await?,
             update_sender: s,
-            background_tasks,
-        };
+            background_tasks: Mutex::new(background_tasks),
+            persist: Arc::new(HTTP::new()),
+        }));
 
         Ok(rtn)
     }
 
-    pub async fn add_app(&mut self, mut app: impl App + 'static) -> Result<()> {
+    pub async fn add_app(&self, mut app: impl App + 'static) -> Result<()> {
         let name = format!("{}", app);
         let update_span = info_span!("应用", name);
         let _span = update_span.enter();
 
         trace!("初始化(ignite)");
-        app.ignite(self).await?;
+        app.ignite(self.clone()).await?;
         trace!("自动注册更新器");
-        self.add_updater(app);
+        self.add_updater(app).await;
         Ok(())
     }
 
-    pub fn add_updater(&mut self, updater: impl Updater + 'static) -> () {
+    pub async fn add_updater(&self, updater: impl Updater + 'static) -> () {
         let name = format!("{}", &updater);
         let update_span = info_span!("更新器", name);
 
         let recv = self.update_sender.subscribe();
-        let runtime = UpdateRuntime::new(recv, self.client.clone(), Box::new(updater));
+        let runtime = UpdateRuntime::new(recv, self.clone(), Box::new(updater));
 
         self.add_background_task(
             &format!("{}", runtime),
@@ -79,17 +99,18 @@ impl Context {
                 runtime.run().await
             }
             .instrument(update_span),
-        );
+        )
+        .await;
     }
 
-    pub fn add_background_task(
-        &mut self,
+    pub async fn add_background_task(
+        &self,
         name: &str,
         task: impl Future<Output = Result<()>> + Send + 'static,
     ) -> () {
         let bg_span = info_span!("后台任务", name);
 
-        self.background_tasks.spawn(
+        self.background_tasks.lock().await.spawn(
             async move {
                 info!("启动");
                 task.await
@@ -98,7 +119,7 @@ impl Context {
         );
     }
 
-    pub fn start_listen_updates(&mut self) -> () {
+    pub async fn start_listen_updates(&mut self) -> () {
         let client = self.client.clone();
         let sender = self.update_sender.clone();
 
@@ -108,15 +129,20 @@ impl Context {
                 trace!("发送");
                 sender.send(update)?;
             }
-        });
+        })
+        .await;
+    }
+
+    pub fn persist(&self) -> Arc<dyn Persist> {
+        self.persist.clone()
     }
 
     /// Run until error occurs. Return first error.
-    pub async fn run(mut self) -> Result<()> {
+    pub async fn run(self) -> Result<()> {
         let main_span = info_span!("主进程");
         let _span = main_span.enter();
 
-        while let Some(result) = self.background_tasks.join_next().await {
+        while let Some(result) = self.background_tasks.lock().await.join_next().await {
             result??;
         }
         Ok(())

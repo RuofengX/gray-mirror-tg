@@ -22,7 +22,7 @@ impl Display for Finder {
 }
 
 impl App for Finder {
-    async fn ignite(&mut self, context: &mut Context) -> Result<()> {
+    async fn ignite(&mut self, context: Context) -> Result<()> {
         context.add_app(SosoScraper::new("KK园区")).await?;
         Ok(())
     }

@@ -4,11 +4,10 @@ use tokio;
 
 pub mod login;
 
-/// 处理存量数据
-pub mod types;
-
 pub mod app;
 pub mod context;
+pub mod types;
+pub mod persist;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -18,7 +17,7 @@ async fn main() -> Result<()> {
 
     context.add_app(app::finder::Finder::new()).await?;
 
-    context.start_listen_updates();
+    context.start_listen_updates().await;
     context.run().await?;
 
     Ok(())

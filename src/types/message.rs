@@ -8,21 +8,36 @@ use grammers_client::grammers_tl_types::{self as tl, types::KeyboardButtonCallba
 use grammers_client::Client;
 use serde::{Deserialize, Serialize};
 use tracing::{info, info_span, warn};
+use sea_orm::entity::prelude::*;
 
-use super::link;
+use super::{link, PeerType};
+
+
+pub struct Model{
+    id: i32,
+    link: String,
+    text: String,
+    contain_link_ids: Vec<i32>,
+    peer_type: PeerType,
+    peer_id: i64,
+    raw_json: String 
+    // TODO: add photo and video support
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Model {
+pub struct Message {
     raw: tl::types::Message,
     input_peer: InputPeer,
 }
-impl Display for Model {
+
+
+impl Display for Message {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.raw.message.fmt(f)
     }
 }
 
-impl From<&grammers_client::types::Message> for Model {
+impl From<&grammers_client::types::Message> for Message {
     fn from(value: &grammers_client::types::Message) -> Self {
         Self {
             raw: value.raw.clone(),
@@ -30,8 +45,8 @@ impl From<&grammers_client::types::Message> for Model {
         }
     }
 }
-impl Model {
-    pub fn extract_links(&self, source: &impl Display) -> Vec<link::Model> {
+impl Message {
+    pub fn extract_links(&self, source: &impl Display) -> Vec<link::Link> {
         let fetch_span = info_span!("提取消息内文本链接");
         let _span = fetch_span.enter();
 
@@ -49,7 +64,7 @@ impl Model {
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
                             info!(stage = "数据发现", "{}", desc);
-                            rtn.push(link::Model::new(link, desc, &source));
+                            rtn.push(link::Link::new(link, desc, &source));
                         } else {
                             warn!("提取链接时错误 >> offset: {offset}; len: {len}");
                         }

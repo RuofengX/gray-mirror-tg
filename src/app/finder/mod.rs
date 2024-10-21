@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::{fmt::{Display, Formatter}, time::Duration};
 
 use crate::context::Context;
 
@@ -9,7 +9,7 @@ use super::{App, Updater};
 
 pub mod soso;
 
-pub const KEYWORDS: [&str; 6] = ["KK", "世纪", "金州", "金帝", "东风", "担保"];
+pub const KEYWORDS: [&str; 6] = ["KK园区", "世纪园区", "金州园区", "金帝园区", "东风园区", "担保"];
 
 #[derive(Debug)]
 pub struct Finder {}
@@ -23,7 +23,11 @@ impl Display for Finder {
 
 impl App for Finder {
     async fn ignite(&mut self, context: Context) -> Result<()> {
-        context.add_app(SosoScraper::new("KK园区")).await?;
+        for i in KEYWORDS {
+            context.add_updater(SosoScraper::new(i)).await;
+            context.client.send_message(soso::SOSO, i).await?;
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
         Ok(())
     }
 }

@@ -1,10 +1,6 @@
 use std::{fmt::Display, time::Duration};
 
-use crate::{
-    app::{App, Updater},
-    context::Context,
-    types::MirrorMessage,
-};
+use crate::{app::Updater, context::Context, types::MirrorMessage};
 use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{session::PackedType, types::PackedChat};
@@ -27,12 +23,6 @@ impl Display for SosoScraper {
         Ok(())
     }
 }
-impl App for SosoScraper {
-    async fn ignite(&mut self, context: Context) -> Result<()> {
-        context.client.send_message(SOSO, self.keyword).await?;
-        Ok(())
-    }
-}
 
 #[async_trait]
 impl Updater for SosoScraper {
@@ -46,7 +36,7 @@ impl Updater for SosoScraper {
             if !context.persist.contain("search", &data).await? {
                 info!("发送至存储");
                 context.persist.push("search", data).await;
-            } else{
+            } else {
                 info!("已存储");
             }
         }

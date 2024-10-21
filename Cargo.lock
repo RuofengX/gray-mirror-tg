@@ -904,6 +904,7 @@ version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "const-random",
  "dotenv_codegen",
  "grammers-client",
@@ -2563,6 +2564,8 @@ dependencies = [
  "sqlformat",
  "thiserror",
  "time",
+ "tokio",
+ "tokio-stream",
  "tracing",
  "url",
  "uuid",
@@ -2603,6 +2606,7 @@ dependencies = [
  "sqlx-sqlite",
  "syn 2.0.82",
  "tempfile",
+ "tokio",
  "url",
 ]
 

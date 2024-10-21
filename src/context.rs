@@ -17,12 +17,12 @@ use url::Url;
 
 use crate::{
     app::{App, UpdateRuntime, Updater},
-    persist::{Persist, HTTP},
+    persist::Database,
 };
 
 pub struct ContextInner {
     pub client: Client,
-    pub persist: Arc<dyn Persist>,
+    pub persist: Database,
     background_tasks: Mutex<JoinSet<Result<()>>>,
     update_sender: Sender<Update>,
 }
@@ -69,7 +69,7 @@ impl Context {
             client: crate::login::login_with_dotenv().await?,
             update_sender: s,
             background_tasks: Mutex::new(background_tasks),
-            persist: Arc::new(HTTP::new()),
+            persist: Database::new().await?,
         }));
 
         Ok(rtn)
@@ -133,10 +133,6 @@ impl Context {
             }
         })
         .await;
-    }
-
-    pub fn persist(&self) -> Arc<dyn Persist> {
-        self.persist.clone()
     }
 
     /// Run until error occurs. Return first error.

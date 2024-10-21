@@ -2,58 +2,45 @@ use std::fmt::{Display, Formatter};
 use std::time::Duration;
 
 use anyhow::Result;
-use grammers_client::grammers_tl_types::enums::{InputPeer, MessageEntity};
+use grammers_client::grammers_tl_types::enums::MessageEntity;
 use grammers_client::grammers_tl_types::functions::messages::GetBotCallbackAnswer;
 use grammers_client::grammers_tl_types::{self as tl, types::KeyboardButtonCallback};
 use grammers_client::Client;
-use serde::{Deserialize, Serialize};
-use tracing::{info, info_span, warn};
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
+use tracing::{info, info_span, warn};
 
-use super::{link, PeerType};
+use super::{link, Source, SourceType};
 
-
-pub struct Model{
-    id: i32,
-    link: String,
-    text: String,
-    contain_link_ids: Vec<i32>,
-    peer_type: PeerType,
-    peer_id: i64,
-    raw_json: String 
-    // TODO: add photo and video support
+#[derive(Debug, Clone)]
+pub struct MessageExt {
+    inner: grammers_client::types::Message,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Message {
-    raw: tl::types::Message,
-    input_peer: InputPeer,
-}
-
-
-impl Display for Message {
+impl Display for MessageExt {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.raw.message.fmt(f)
+        self.inner.raw.message.fmt(f)
     }
 }
 
-impl From<&grammers_client::types::Message> for Message {
+impl From<&grammers_client::types::Message> for MessageExt {
     fn from(value: &grammers_client::types::Message) -> Self {
-        Self {
-            raw: value.raw.clone(),
-            input_peer: value.chat().pack().to_input_peer(),
-        }
+        MessageExt { inner: value.clone() }
     }
 }
-impl Message {
-    pub fn extract_links(&self, source: &impl Display) -> Vec<link::Link> {
+impl MessageExt {
+    pub fn text(&self) -> &str {
+        self.inner.text()
+    }
+
+    pub fn links(&self) -> Vec<link::ActiveModel> {
         let fetch_span = info_span!("提取消息内文本链接");
         let _span = fetch_span.enter();
 
         let mut rtn = Vec::new();
-        let words: Vec<u16> = self.raw.message.encode_utf16().collect();
+        let words: Vec<u16> = self.inner.raw.message.encode_utf16().collect();
 
-        if let Some(ref ents) = self.raw.entities {
+        if let Some(ref ents) = self.inner.raw.entities {
             for ent in ents {
                 match ent {
                     MessageEntity::TextUrl(url) => {
@@ -64,7 +51,13 @@ impl Message {
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
                             info!(stage = "数据发现", "{}", desc);
-                            rtn.push(link::Link::new(link, desc, &source));
+                            rtn.push(link::ActiveModel {
+                                link: Set(link),
+                                desc: Set(desc),
+                                source: Set(SourceType::Message),
+                                source_id: Set(self.inner.id()),
+                                ..Default::default()
+                            });
                         } else {
                             warn!("提取链接时错误 >> offset: {offset}; len: {len}");
                         }
@@ -77,11 +70,11 @@ impl Message {
         rtn
     }
 
-    pub fn extract_inline_buttons(&self) -> Vec<KeyboardButtonCallback> {
+    pub fn callback_buttons(&self) -> Vec<KeyboardButtonCallback> {
         let fetch_button_span = info_span!("提取反馈按钮");
         let _span = fetch_button_span.enter();
 
-        let reply_markup = &self.raw.reply_markup;
+        let reply_markup = &self.inner.raw.reply_markup;
 
         let mut rtn = Vec::new();
         if let Some(tl::enums::ReplyMarkup::ReplyInlineMarkup(markup)) = reply_markup {
@@ -101,7 +94,7 @@ impl Message {
         rtn
     }
 
-    pub async fn click_callback_buttons(
+    pub async fn click_callback_button(
         &self,
         client: &Client,
         button: &KeyboardButtonCallback,
@@ -115,12 +108,42 @@ impl Message {
         client
             .invoke(&GetBotCallbackAnswer {
                 game: false,
-                peer: self.input_peer.clone(),
-                msg_id: self.raw.id,
+                peer: self.inner.chat().pack().to_input_peer(),
+                msg_id: self.inner.raw.id,
                 data: Some(button.data.clone()),
                 password: None,
             })
             .await?;
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+#[sea_orm(table_name = "message")]
+pub struct Model {
+    #[sea_orm(primary_key)]
+    pub id: i32,
+    pub message: String,
+    pub raw: Json,
+    pub source: SourceType,
+    pub source_id: i32,
+    // TODO: add photo and video support
+    // TODO: add message url
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
+
+impl ActiveModel {
+    pub fn from_msg(msg: &MessageExt, source: &Source) -> Self {
+        Self {
+            raw: Set(serde_json::to_value(&msg.inner.raw).unwrap()),
+            message: Set(msg.inner.raw.message.clone()),
+            source: Set(source.ty),
+            source_id: Set(source.id),
+            ..Default::default()
+        }
     }
 }

@@ -1,10 +1,14 @@
 use std::{fmt::Display, time::Duration};
 
-use crate::{app::Updater, context::Context, types::Message};
+use crate::{
+    app::Updater,
+    context::Context,
+    types::{message, MessageExt, Source},
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{session::PackedType, types::PackedChat};
-use tracing::{debug, info, info_span};
+use tracing::info_span;
 
 pub const SOSO: PackedChat = PackedChat {
     ty: PackedType::Bot,
@@ -15,6 +19,7 @@ pub const SOSO: PackedChat = PackedChat {
 #[derive(Debug)]
 pub struct SosoScraper {
     pub keyword: &'static str,
+    pub source: Source,
 }
 
 impl Display for SosoScraper {
@@ -26,26 +31,22 @@ impl Display for SosoScraper {
 
 #[async_trait]
 impl Updater for SosoScraper {
-    async fn message_recv(&mut self, context: Context, msg: Message) -> Result<()> {
+    async fn message_recv(&mut self, context: Context, msg: MessageExt) -> Result<()> {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
 
-        let links = msg.extract_links(&self);
-        for link in links {
-            let data = link.into();
-            if !context.persist.contain("search", &data).await? {
-                info!("发送至存储");
-                context.persist.push("search", data).await;
-            } else {
-                debug!("已存储");
-            }
-        }
+        context
+            .persist
+            .put_message(message::ActiveModel::from_msg(&msg, &self.source))
+            .await?;
+        let links = msg.links();
+        context.persist.put_link_vec(links).await?;
 
-        let buttons = msg.extract_inline_buttons();
+        let buttons = msg.callback_buttons();
         for btn in buttons {
             if btn.text.contains("下一页") || btn.text.contains("➡️") {
                 let _ = msg
-                    .click_callback_buttons(&context.client, &btn, Duration::from_secs(1))
+                    .click_callback_button(&context.client, &btn, Duration::from_secs(1))
                     .await;
                 // 搜搜机器人不会有返回值，而是直接修改消息内容，直接忽略
             }
@@ -56,7 +57,7 @@ impl Updater for SosoScraper {
         Ok(())
     }
 
-    async fn message_edited(&mut self, client: Context, msg: Message) -> Result<()> {
+    async fn message_edited(&mut self, client: Context, msg: MessageExt) -> Result<()> {
         self.message_recv(client, msg).await?;
         Ok(())
     }
@@ -75,7 +76,7 @@ impl Updater for SosoScraper {
 }
 
 impl SosoScraper {
-    pub fn new(keyword: &'static str) -> Self {
-        Self { keyword }
+    pub fn new(keyword: &'static str, source: Source) -> Self {
+        Self { keyword, source }
     }
 }

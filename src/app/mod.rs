@@ -9,7 +9,7 @@ use grammers_client::{
 use tokio::sync::broadcast::{self, Receiver};
 use tracing::{error, info_span, trace};
 
-use crate::{context::Context, types::Message };
+use crate::{context::Context, types::MessageExt};
 
 /// 简单的范用应用
 pub mod generic;
@@ -28,12 +28,12 @@ pub trait App: Updater + Display + Send + Sync {
 #[async_trait]
 pub trait Updater: Display + Send + Sync {
     /// Occurs whenever a new text message or a message with media is produced.
-    async fn message_recv(&mut self, _context: Context, _msg: Message) -> Result<()> {
+    async fn message_recv(&mut self, _context: Context, _msg: MessageExt) -> Result<()> {
         Ok(())
     }
 
     /// Occurs when a message is updated.
-    async fn message_edited(&mut self, _context: Context, _msg: Message) -> Result<()> {
+    async fn message_edited(&mut self, _context: Context, _msg: MessageExt) -> Result<()> {
         Ok(())
     }
 
@@ -114,7 +114,9 @@ pub trait Updater: Display + Send + Sync {
                         None
                     }
                 }
-                Update::MessageDeleted(msg_del) => self.message_deletion_raw(context, msg_del).await,
+                Update::MessageDeleted(msg_del) => {
+                    self.message_deletion_raw(context, msg_del).await
+                }
                 Update::CallbackQuery(callback_query) => {
                     self.callback_query_raw(context, callback_query).await
                 }

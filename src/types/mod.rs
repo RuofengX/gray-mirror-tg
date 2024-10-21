@@ -1,37 +1,57 @@
-use serde::{Deserialize, Serialize};
 use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
 
-pub mod message;
 pub mod link;
+pub mod message;
+pub mod search;
 
-pub use message::Message as Message;
-pub use link::Link as Link;
+pub use link::Model;
+pub use message::MessageExt;
 
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GenericData{
-    Message(Message),
-    Link(Link),
-}
-impl From<Message> for GenericData{
-    fn from(value: Message) -> Self {
-        GenericData::Message(value)
-    }
-}
-
-impl From<Link> for GenericData{
-    fn from(value: Link) -> Self {
-        GenericData::Link(value)
-    }
-}
-
-#[derive(EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
-pub enum PeerType{
-    #[sea_orm(string_value = "chat")]
-    Chat,
-    #[sea_orm(string_value = "channel")]
-    Channel,
-    #[sea_orm(string_value = "user")]
-    User,
+pub enum SourceType {
+    #[sea_orm(string_value = "-")]
+    None,
+    #[sea_orm(string_value = "search")]
+    Search,
+    #[sea_orm(string_value = "link")]
+    Link,
+    #[sea_orm(string_value = "message")]
+    Message,
+    // TODO: 添加群组爬虫的来源
+}
+
+#[derive(Debug, Clone)]
+pub struct Source {
+    ty: SourceType,
+    id: i32,
+}
+
+impl Source {
+    pub fn from_search(search: &search::Model) -> Self {
+        Self {
+            ty: SourceType::Search,
+            id: search.id,
+        }
+    }
+
+    pub fn from_link(link: &link::Model) -> Self {
+        Self {
+            ty: SourceType::Link,
+            id: link.id,
+        }
+    }
+
+    pub fn from_message(msg_id: i32) -> Self {
+        Self {
+            ty: SourceType::Message,
+            id: msg_id,
+        }
+    }
+}
+impl Into<(SourceType, i32)> for Source {
+    fn into(self) -> (SourceType, i32) {
+        (self.ty, self.id)
+    }
 }

@@ -1,89 +1,79 @@
 use anyhow::Result;
-use async_trait::async_trait;
-use reqwest::StatusCode;
-use tracing::{debug, error, info_span};
-use url::Url;
+use dotenv_codegen::dotenv;
+use sea_orm::{sea_query::OnConflict, ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait, Schema};
+use tracing::{debug, info_span};
 
-use crate::types::GenericData;
+use crate::types::{link, message, search};
 
-#[async_trait]
-pub trait Persist: Sync + Send {
-    async fn push(&self, collection: &str, data: GenericData) -> ();
-    async fn contain(&self, collection: &str, data: &GenericData) -> Result<bool>;
+pub struct Database {
+    pub raw: DatabaseConnection,
 }
+impl Database {
+    pub const DB_URL: &'static str = dotenv!("DATABASE_URL");
+    pub async fn new() -> Result<Self> {
+        debug!("{}", Self::DB_URL);
+        let db = sea_orm::Database::connect(Self::DB_URL).await?;
 
-pub struct HTTP {
-    client: reqwest::Client,
-}
-impl HTTP {
-    const BASE: &'static str = dotenv_codegen::dotenv!("PERSIST_URL");
-    const UA: &'static str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
-    pub fn new() -> Self {
-        HTTP {
-            client: reqwest::Client::new(),
-        }
-    }
-    pub fn get_url(collection: &str, operation: &str) -> Url {
-        Url::parse(&format!("{}/tg/{collection}/{operation}", HTTP::BASE)).unwrap()
-    }
-}
+        let builder = db.get_database_backend();
+        let schema = Schema::new(builder);
 
-#[async_trait]
-impl Persist for HTTP {
-    /// `/tg/{collection}/push`
-    async fn push(&self, collection: &str, data: GenericData) -> () {
-        let push_span = info_span!("投递");
-        let _span = push_span.enter();
+        db.execute(builder.build(schema.create_table_from_entity(link::Entity).if_not_exists())).await?;
+        db.execute(builder.build(schema.create_table_from_entity(search::Entity).if_not_exists())).await?;
+        db.execute(builder.build(schema.create_table_from_entity(message::Entity).if_not_exists())).await?;
 
-        let url = HTTP::get_url(&collection, "push");
-        debug!("{}", url);
 
-        let req = self.client.put(url);
-        let resp = req
-            .header("User-Agent", HTTP::UA)
-            .body(serde_json::to_string(&data).unwrap())
-            .send()
-            .await;
 
-        match resp {
-            Ok(resp) => {
-                if resp.status() != StatusCode::OK {
-                    error!("未成功 >> {}", resp.status());
-                }
-            }
-            Err(e) => {
-                error!("未成功 >> {}", e);
-            }
-        }
+        Ok(Self { raw: db })
     }
 
-    /// `/tg/{collection}/contain`
-    async fn contain(&self, collection: &str, data: &GenericData) -> Result<bool> {
-        let contain_span = info_span!("查重");
-        let _span = contain_span.enter();
-        let url = HTTP::get_url(&collection, "contain");
+    pub async fn put_message(&self, data: message::ActiveModel) -> Result<message::Model> {
+        let span = info_span!("提交消息");
+        let _span = span.enter();
 
-        let req = self.client.post(url);
-        let resp = req
-            .header("User-Agent", HTTP::UA)
-            .body(serde_json::to_string(&data)?)
-            .send()
+        debug!("{:?}", data);
+        let rtn = data.insert(&self.raw).await?;
+        Ok(rtn)
+    }
+
+    pub async fn put_message_vec(&self, data_vec: Vec<message::ActiveModel>) -> Result<()> {
+        let span = info_span!("提交多个消息");
+        let _span = span.enter();
+
+        debug!("{:?}", data_vec);
+        let _ = message::Entity::insert_many(data_vec)
+            .on_conflict(OnConflict::column(link::Column::Id).do_nothing().to_owned())
+            .exec(&self.raw)
             .await?;
+        Ok(())
+    }
 
-        if resp.status() != StatusCode::OK {
-            error!("未成功 >> {}", resp.status());
-        }
+    pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
+        let span = info_span!("提交链接");
+        let _span = span.enter();
 
-        let text = resp.text().await?;
-        if text.contains("true") {
-            return Ok(true);
-        }
+        debug!("{:?}", data);
+        let rtn = data.insert(&self.raw).await?;
+        Ok(rtn)
+    }
 
-        if text.contains("false") {
-            return Ok(false);
-        }
+    pub async fn put_link_vec(&self, data_vec: Vec<link::ActiveModel>) -> Result<()> {
+        let span = info_span!("提交多个链接");
+        let _span = span.enter();
 
-        error!("服务器返回错误值 >> {}", text);
-        Ok(false)
+        debug!("{:?}", data_vec);
+        let _ = link::Entity::insert_many(data_vec)
+            .on_conflict(OnConflict::column(link::Column::Id).do_nothing().to_owned())
+            .exec(&self.raw)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {
+        let span = info_span!("提交搜索");
+        let _span = span.enter();
+
+        debug!("{:?}", data);
+        let rtn = data.insert(&self.raw).await?;
+        Ok(rtn)
     }
 }

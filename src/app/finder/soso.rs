@@ -46,7 +46,7 @@ impl Updater for SosoScraper {
         for btn in buttons {
             if btn.text.contains("下一页") || btn.text.contains("➡️") {
                 let _ = msg
-                    .click_callback_button(&context.client, &btn, Duration::from_secs(1))
+                    .click_callback_button(&context.client, &btn, Duration::from_secs(10))
                     .await;
                 // 搜搜机器人不会有返回值，而是直接修改消息内容，直接忽略
             }

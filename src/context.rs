@@ -95,7 +95,6 @@ impl Context {
         self.add_background_task(
             &format!("{}", runtime),
             async move {
-                info!("{} > 启动", &runtime);
                 runtime.run().await
             }
             .instrument(update_span),

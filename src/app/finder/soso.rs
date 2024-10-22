@@ -55,8 +55,9 @@ impl Updater for SosoScraper {
             .persist
             .put_message(message::ActiveModel::from_msg(&msg, &self.source))
             .await?;
-        let links = msg.links();
-        context.persist.put_link_vec(links).await?;
+        for link in msg.links(){
+            context.persist.put_link(link).await?;
+        }
 
         let buttons = msg.callback_buttons();
         for btn in buttons {

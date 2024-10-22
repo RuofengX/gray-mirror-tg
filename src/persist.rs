@@ -1,8 +1,8 @@
 use anyhow::Result;
 use dotenv_codegen::dotenv;
 use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, QueryFilter, Schema,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait,
+    DatabaseConnection, EntityTrait, QueryFilter, Schema,
 };
 use tracing::{debug, info_span};
 
@@ -15,7 +15,10 @@ impl Database {
     pub const DB_URL: &'static str = dotenv!("DATABASE_URL");
     pub async fn new() -> Result<Self> {
         debug!("{}", Self::DB_URL);
-        let db = sea_orm::Database::connect(Self::DB_URL).await?;
+        let mut opt = ConnectOptions::new(Self::DB_URL.to_owned());
+        opt.sqlx_logging(false); // Disable SQLx log
+
+        let db = sea_orm::Database::connect(opt).await?;
 
         let builder = db.get_database_backend();
         let schema = Schema::new(builder);
@@ -58,18 +61,6 @@ impl Database {
         Ok(rtn)
     }
 
-    pub async fn put_message_vec(&self, data_vec: Vec<message::ActiveModel>) -> Result<()> {
-        let span = info_span!("提交多个消息");
-        let _span = span.enter();
-
-        debug!("{:?}", data_vec);
-        let _ = message::Entity::insert_many(data_vec)
-            .on_conflict(OnConflict::column(link::Column::Id).do_nothing().to_owned())
-            .exec(&self.raw)
-            .await?;
-        Ok(())
-    }
-
     pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
         let span = info_span!("提交链接");
         let _span = span.enter();
@@ -83,22 +74,15 @@ impl Database {
             Ok(exist)
         } else {
             let rtn = link::Entity::insert(data)
+                .on_conflict(
+                    OnConflict::column(link::Column::Link)
+                        .do_nothing()
+                        .to_owned(),
+                )
                 .exec_with_returning(&self.raw)
                 .await?;
             Ok(rtn)
         }
-    }
-
-    pub async fn put_link_vec(&self, data_vec: Vec<link::ActiveModel>) -> Result<()> {
-        let span = info_span!("提交多个链接");
-        let _span = span.enter();
-
-        debug!("{:?}", data_vec);
-        let _ = link::Entity::insert_many(data_vec)
-            .on_conflict(OnConflict::column(link::Column::Id).do_nothing().to_owned())
-            .exec(&self.raw)
-            .await?;
-        Ok(())
     }
 
     pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {

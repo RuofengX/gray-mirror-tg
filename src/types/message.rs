@@ -122,7 +122,7 @@ impl MessageExt {
 #[sea_orm(table_name = "message")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: i32, // get raw id
     pub message: String,
     pub raw: Json,
     pub source: SourceType,

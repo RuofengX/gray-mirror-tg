@@ -1,8 +1,8 @@
 use anyhow::Result;
 use dotenv_codegen::dotenv;
 use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    Schema,
+    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, QueryFilter, Schema,
 };
 use tracing::{debug, info_span};
 
@@ -75,15 +75,18 @@ impl Database {
         let _span = span.enter();
 
         debug!("{:?}", data);
-        let rtn = link::Entity::insert(data)
-            .on_conflict(
-                OnConflict::column(link::Column::Link)
-                    .do_nothing()
-                    .to_owned(),
-            )
-            .exec_with_returning(&self.raw)
+        let exist = link::Entity::find()
+            .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
+            .one(&self.raw)
             .await?;
-        Ok(rtn)
+        if let Some(exist) = exist {
+            Ok(exist)
+        } else {
+            let rtn = link::Entity::insert(data)
+                .exec_with_returning(&self.raw)
+                .await?;
+            Ok(rtn)
+        }
     }
 
     pub async fn put_link_vec(&self, data_vec: Vec<link::ActiveModel>) -> Result<()> {

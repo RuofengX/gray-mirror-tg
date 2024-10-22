@@ -190,7 +190,7 @@ pub struct UpdateRuntime {
 impl Display for UpdateRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.method.fmt(f)?;
-        write!(f, " >> 运行时")?;
+        write!(f, "_运行时")?;
         Ok(())
     }
 }

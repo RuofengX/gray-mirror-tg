@@ -1,5 +1,6 @@
 use std::{
     fmt::{Display, Formatter},
+    sync::Arc,
     time::Duration,
 };
 
@@ -9,13 +10,16 @@ use crate::{
 };
 
 use anyhow::Result;
-use grammers_client::types::PackedChat;
+use engine::Engine;
 use sea_orm::Set;
-use soso::{SosoScraper, SOSO};
+use soso::SosoScraper;
+use tokio::sync::RwLock;
 
 use super::{App, Updater};
 
+pub mod engine;
 pub mod soso;
+pub mod watchdog;
 
 pub const KEYWORDS: [&str; 6] = [
     "KK园区",
@@ -25,10 +29,13 @@ pub const KEYWORDS: [&str; 6] = [
     "东风园区",
     "担保",
 ];
-pub const BOTS: PackedChat = SOSO; // TODO: Add bot list
+pub const SEARCH_ENGINE: &str = "SOSO";
+// TODO: Add bot list
 
 #[derive(Debug)]
-pub struct Finder {}
+pub struct Finder {
+    engine: Engine,
+}
 
 impl Display for Finder {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -40,18 +47,39 @@ impl Display for Finder {
 impl App for Finder {
     async fn ignite(&mut self, context: Context) -> Result<()> {
         for key in KEYWORDS {
+            // 新建搜索
             let search = search::ActiveModel {
-                bot: Set("SOSO".to_string()),
+                bot: Set(SEARCH_ENGINE.to_string()),
                 start_time: Set(chrono::Local::now().naive_local()),
                 keyword: Set(key.to_string()),
                 ..Default::default()
             };
             let search = context.persist.put_search(search).await?;
             let source = Source::from_search(&search);
-            context.add_updater(SosoScraper::new(key, source)).await;
-            context.client.send_message(soso::SOSO, key).await?;
+
+            // 时间同步量
+            let time_sync = Arc::new(RwLock::new(tokio::time::Instant::now()));
+
+            // 启动WD
+            let watchdog = watchdog::Watchdog::new(self.engine, key, time_sync.clone());
+            context
+                .add_background_task(
+                    &format!("{}", &watchdog),
+                    watchdog.background_task(context.clone()),
+                )
+                .await;
+
+            // 启动更新器
+            context
+                .add_updater(SosoScraper::new(
+                    context.clone(),
+                    key,
+                    source,
+                    time_sync.clone(),
+                ))
+                .await;
+
             tokio::time::sleep(Duration::from_secs(5)).await;
-            // TODO: 添加逻辑，当长时间接受不到某一关键词的反馈时，watchdog重新搜索
         }
         Ok(())
     }
@@ -60,7 +88,7 @@ impl App for Finder {
 impl Updater for Finder {}
 
 impl Finder {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(engine: Engine) -> Self {
+        Self { engine }
     }
 }

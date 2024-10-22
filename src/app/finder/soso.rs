@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Duration};
+use std::{fmt::Display, sync::Arc, time::Duration};
 
 use crate::{
     app::Updater,
@@ -7,19 +7,32 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::{session::PackedType, types::PackedChat};
+use tokio::{sync::RwLock, time::Instant};
 use tracing::info_span;
 
-pub const SOSO: PackedChat = PackedChat {
-    ty: PackedType::Bot,
-    id: 7048419795,
-    access_hash: Some(7758671014432728719),
-};
+use super::engine::Engine;
 
 #[derive(Debug)]
-pub struct SosoScraper {
+pub struct SosoScraper {  //TODO: 改为通用型搜索，
     pub keyword: &'static str,
     pub source: Source,
+    last_update: Arc<RwLock<Instant>>,
+}
+
+impl SosoScraper {
+    pub const ENGINE: Engine = Engine::SOSO;
+    pub fn new(
+        _context: Context,
+        keyword: &'static str,
+        source: Source,
+        last_update: Arc<RwLock<Instant>>,
+    ) -> Self {
+        SosoScraper {
+            keyword,
+            source,
+            last_update,
+        }
+    }
 }
 
 impl Display for SosoScraper {
@@ -52,6 +65,9 @@ impl Updater for SosoScraper {
             }
         }
 
+        let mut last = self.last_update.write().await;
+        *last = Instant::now();
+
         // TODO
 
         Ok(())
@@ -67,16 +83,10 @@ impl Updater for SosoScraper {
     }
 
     fn filter_chat_id(&self) -> Option<&[i64]> {
-        Some(&[SOSO.id])
+        Some(&[Self::ENGINE.chat.id])
     }
 
     fn filter_word(&self) -> Option<String> {
         Some(format!("关键词：{}", self.keyword))
-    }
-}
-
-impl SosoScraper {
-    pub fn new(keyword: &'static str, source: Source) -> Self {
-        Self { keyword, source }
     }
 }

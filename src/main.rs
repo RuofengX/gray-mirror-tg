@@ -1,4 +1,5 @@
 use anyhow::Result;
+use app::finder::engine::Engine;
 use context::Context;
 use tokio;
 
@@ -6,8 +7,8 @@ pub mod login;
 
 pub mod app;
 pub mod context;
-pub mod types;
 pub mod persist;
+pub mod types;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {
@@ -17,7 +18,9 @@ async fn main() -> Result<()> {
 
     context.start_listen_updates().await;
 
-    context.add_app(app::finder::Finder::new()).await?;
+    context
+        .add_app(app::finder::Finder::new(Engine::SOSO))
+        .await?;
 
     context.run().await?;
 

@@ -17,7 +17,7 @@ pub mod generic;
 /// 利用soso等机器人挖掘关联群组
 pub mod finder;
 
-pub trait App: Updater + Display + Send + Sync {
+pub trait App: Display + Send + Sync {
     /// 初始化数据
     fn ignite(&mut self, _context: Context) -> impl Future<Output = Result<()>> {
         async { Ok(()) }

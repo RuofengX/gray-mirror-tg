@@ -82,8 +82,6 @@ impl Context {
 
         trace!("初始化(ignite)");
         app.ignite(self.clone()).await?;
-        trace!("自动注册更新器");
-        self.add_updater(app).await;
         Ok(())
     }
 
@@ -110,7 +108,7 @@ impl Context {
         name: &str,
         task: impl Future<Output = Result<()>> + Send + 'static,
     ) -> () {
-        let bg_span = info_span!("后台任务", name);
+        let bg_span = info_span!("后台任务", name = name);
 
         self.background_tasks.lock().await.spawn(
             async move {

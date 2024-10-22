@@ -1,6 +1,9 @@
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use sea_orm::{sea_query::OnConflict, ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait, Schema};
+use sea_orm::{
+    sea_query::OnConflict, ActiveModelTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    Schema,
+};
 use tracing::{debug, info_span};
 
 use crate::types::{link, message, search};
@@ -17,11 +20,30 @@ impl Database {
         let builder = db.get_database_backend();
         let schema = Schema::new(builder);
 
-        db.execute(builder.build(schema.create_table_from_entity(link::Entity).if_not_exists())).await?;
-        db.execute(builder.build(schema.create_table_from_entity(search::Entity).if_not_exists())).await?;
-        db.execute(builder.build(schema.create_table_from_entity(message::Entity).if_not_exists())).await?;
-
-
+        db.execute(
+            builder.build(
+                schema
+                    .create_table_from_entity(link::Entity)
+                    .if_not_exists(),
+            ),
+        )
+        .await?;
+        db.execute(
+            builder.build(
+                schema
+                    .create_table_from_entity(search::Entity)
+                    .if_not_exists(),
+            ),
+        )
+        .await?;
+        db.execute(
+            builder.build(
+                schema
+                    .create_table_from_entity(message::Entity)
+                    .if_not_exists(),
+            ),
+        )
+        .await?;
 
         Ok(Self { raw: db })
     }
@@ -53,7 +75,14 @@ impl Database {
         let _span = span.enter();
 
         debug!("{:?}", data);
-        let rtn = data.insert(&self.raw).await?;
+        let rtn = link::Entity::insert(data)
+            .on_conflict(
+                OnConflict::column(link::Column::Link)
+                    .do_nothing()
+                    .to_owned(),
+            )
+            .exec_with_returning(&self.raw)
+            .await?;
         Ok(rtn)
     }
 

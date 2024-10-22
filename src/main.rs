@@ -9,7 +9,7 @@ pub mod context;
 pub mod types;
 pub mod persist;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {
     println!("你好世界!");
 

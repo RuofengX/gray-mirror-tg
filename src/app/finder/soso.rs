@@ -51,12 +51,18 @@ impl Updater for SosoScraper {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();
 
-        context
+        let msg_id = context
             .persist
             .put_message(message::ActiveModel::from_msg(&msg, &self.source))
-            .await?;
-        for link in msg.links(){
-            context.persist.put_link(link).await?;
+            .await?
+            .id;
+
+        let link_source = Source::from_message(msg_id);
+        for link in msg.links() {
+            context
+                .persist
+                .put_link(link.to_model(&link_source))
+                .await?;
         }
 
         let buttons = msg.callback_buttons();

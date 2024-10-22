@@ -25,7 +25,9 @@ impl Display for MessageExt {
 
 impl From<&grammers_client::types::Message> for MessageExt {
     fn from(value: &grammers_client::types::Message) -> Self {
-        MessageExt { inner: value.clone() }
+        MessageExt {
+            inner: value.clone(),
+        }
     }
 }
 impl MessageExt {
@@ -33,7 +35,7 @@ impl MessageExt {
         self.inner.text()
     }
 
-    pub fn links(&self) -> Vec<link::ActiveModel> {
+    pub fn links(&self) -> Vec<link::Link> {
         let fetch_span = info_span!("提取消息内文本链接");
         let _span = fetch_span.enter();
 
@@ -50,14 +52,8 @@ impl MessageExt {
                         let len = url.length as usize;
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
-                            info!(stage = "数据发现", "{}", desc);
-                            rtn.push(link::ActiveModel {
-                                link: Set(link),
-                                desc: Set(desc),
-                                source: Set(SourceType::Message),
-                                source_id: Set(self.inner.id()),
-                                ..Default::default()
-                            });
+                            info!("{}", desc);
+                            rtn.push(link::Link { link, desc });
                         } else {
                             warn!("提取链接时错误 >> offset: {offset}; len: {len}");
                         }

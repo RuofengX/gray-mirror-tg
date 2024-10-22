@@ -14,7 +14,7 @@ use super::{link, Source, SourceType};
 
 #[derive(Debug, Clone)]
 pub struct MessageExt {
-    inner: grammers_client::types::Message,
+    pub inner: grammers_client::types::Message,
 }
 
 impl Display for MessageExt {
@@ -120,11 +120,11 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32, // get raw id
     pub message: String,
+    pub msg_id: i32,
     pub raw: Json,
     pub source: SourceType,
-    pub source_id: i32,
+    pub source_id: i64,
     // TODO: add photo and video support
-    // TODO: add message url
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -134,9 +134,11 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
     pub fn from_msg(msg: &MessageExt, source: &Source) -> Self {
+        let raw = Set(serde_json::to_value(&msg.inner.raw).unwrap());
         Self {
-            raw: Set(serde_json::to_value(&msg.inner.raw).unwrap()),
             message: Set(msg.inner.raw.message.clone()),
+            msg_id: Set(msg.inner.id()),
+            raw,
             source: Set(source.ty),
             source_id: Set(source.id),
             ..Default::default()

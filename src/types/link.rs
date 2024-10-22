@@ -13,7 +13,7 @@ pub struct Model {
     pub link: String,
     pub desc: String,
     pub source: SourceType,
-    pub source_id: i32,
+    pub source_id: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

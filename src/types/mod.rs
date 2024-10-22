@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 pub mod link;
 pub mod message;
 pub mod search;
+pub mod chat;
+
 
 pub use link::Model;
 pub use message::MessageExt;
@@ -19,39 +21,44 @@ pub enum SourceType {
     Link,
     #[sea_orm(string_value = "message")]
     Message,
+    #[sea_orm(string_value = "chat")]
+    Chat,
     // TODO: 添加群组爬虫的来源
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {
-    ty: SourceType,
-    id: i32,
+    pub ty: SourceType,
+    pub id: i64,
 }
 
 impl Source {
     pub fn from_search(search: &search::Model) -> Self {
         Self {
             ty: SourceType::Search,
-            id: search.id,
+            id: search.id.into(),
         }
     }
 
     pub fn from_link(link: &link::Model) -> Self {
         Self {
             ty: SourceType::Link,
-            id: link.id,
+            id: link.id.into(),
         }
     }
 
     pub fn from_message(msg_id: i32) -> Self {
         Self {
             ty: SourceType::Message,
-            id: msg_id,
+            id: msg_id.into(),
         }
     }
-}
-impl Into<(SourceType, i32)> for Source {
-    fn into(self) -> (SourceType, i32) {
-        (self.ty, self.id)
+
+    pub fn from_chat(chat_id: i64) -> Self{
+        Self {
+            ty: SourceType::Chat,
+            id: chat_id,
+        }
+
     }
 }

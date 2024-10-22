@@ -13,9 +13,11 @@ use tracing::info_span;
 use super::engine::Engine;
 
 #[derive(Debug)]
-pub struct SosoScraper {  //TODO: 改为通用型搜索，
+pub struct SosoScraper {
+    //TODO: 改为通用型搜索，
     pub keyword: &'static str,
     pub source: Source,
+    pub engine: Engine,
     last_update: Arc<RwLock<Instant>>,
 }
 
@@ -30,6 +32,7 @@ impl SosoScraper {
         SosoScraper {
             keyword,
             source,
+            engine: Engine::SOSO,
             last_update,
         }
     }
@@ -37,7 +40,7 @@ impl SosoScraper {
 
 impl Display for SosoScraper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("SOSO_{}", self.keyword))?;
+        f.write_str(&format!("{}_{}", self.engine.name, self.keyword))?;
         Ok(())
     }
 }

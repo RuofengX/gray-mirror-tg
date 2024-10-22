@@ -9,7 +9,7 @@ pub struct Engine {
 
 impl Engine {
     pub const SOSO: Engine = Engine {
-        name: "soso",
+        name: "SOSO",
         chat: PackedChat {
             ty: PackedType::Bot,
             id: 7048419795,

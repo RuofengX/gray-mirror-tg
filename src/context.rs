@@ -114,7 +114,9 @@ impl Context {
         self.background_tasks.lock().await.spawn(
             async move {
                 info!("启动");
-                task.await
+                let rtn = task.await;
+                info!("退出 >> {:?}", rtn);
+                rtn
             }
             .instrument(bg_span),
         );

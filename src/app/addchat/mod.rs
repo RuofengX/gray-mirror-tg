@@ -45,66 +45,71 @@ impl AddChat {
         let _span = group_span.enter();
 
         let db = &context.persist.db;
-        let mut link_iter = link::Entity::find().paginate(db, 1024);
         let mut rate_limit = tokio::time::interval(RESOLVE_USER_NAME_FREQ);
 
         loop {
-            // 从数据库获取一批链接
-            if let Some(links) = link_iter.fetch_and_next().await? {
-                // 将链接尝试转换为 (群组名-消息id) 结构
-                let msg_link_vec: Vec<ChatMessage> = links
-                    .into_iter()
-                    .map(|link| ChatMessage::try_from(link))
-                    .filter_map(|x| {
-                        if let Err(e) = &x {
-                            warn!("链接转换失败 >> {}", e);
-                        }
-                        x.ok()
-                    })
-                    .collect();
-
-                // 遍历link
-                for msg_link in msg_link_vec {
-                    let chat_name = &msg_link.username; // 群组名
-
-                    // 获取chat::Model
-                    // 判断是否已采集，避免频繁调用resolve_username
-                    let chat = if let Some(chat) = context.persist.find_chat(chat_name).await? {
-                        // 已采集
-                        info!("已采集群组名 >> {}", chat_name);
-
-                        // 从Model读取PackedChat
-                        let packed_chat = chat.to_packed()?;
-                        // 用Client解包PackedChat，并返回
-                        context.client.unpack_chat(packed_chat).await?
-                    } else {
-                        // 未采集
-                        info!("新采集群组名 >> {}", chat_name);
-                        let chat = match context.client.resolve_username(chat_name).await? {
-                            Some(chat) => {
-                                // 成功打开chat
-                                // 存入数据库，返回chat::Model
-                                context
-                                    .persist
-                                    .put_chat(chat::ActiveModel::from_chat(&chat, &msg_link.source))
-                                    .await?;
-                                chat
+            let mut link_iter = link::Entity::find().paginate(db, 60);
+            loop {
+                // 从数据库获取一批链接
+                if let Some(links) = link_iter.fetch_and_next().await? {
+                    // 将链接尝试转换为 (群组名-消息id) 结构
+                    let msg_link_vec: Vec<ChatMessage> = links
+                        .into_iter()
+                        .map(|link| ChatMessage::try_from(link))
+                        .filter_map(|x| {
+                            if let Err(e) = &x {
+                                warn!("链接转换失败 >> {}", e);
                             }
-                            None => {
-                                // 查不到chat，放弃，搞下一个link
-                                warn!("查询未找到群组名 >> {}", chat_name);
-                                continue;
-                            }
+                            x.ok()
+                        })
+                        .collect();
+
+                    // 遍历link
+                    for msg_link in msg_link_vec {
+                        let chat_name = &msg_link.username; // 群组名
+
+                        // 获取chat::Model
+                        // 判断是否已采集，避免频繁调用resolve_username
+                        let chat = if let Some(chat) = context.persist.find_chat(chat_name).await? {
+                            // 已采集
+                            info!("已采集群组名 >> {}", chat_name);
+
+                            // 从Model读取PackedChat
+                            let packed_chat = chat.to_packed()?;
+                            // 用Client解包PackedChat，并返回
+                            context.client.unpack_chat(packed_chat).await?
+                        } else {
+                            // 未采集
+                            info!("新采集群组名 >> {}", chat_name);
+                            let chat = match context.client.resolve_username(chat_name).await? {
+                                Some(chat) => {
+                                    // 成功打开chat
+                                    // 存入数据库，返回chat::Model
+                                    context
+                                        .persist
+                                        .put_chat(chat::ActiveModel::from_chat(
+                                            &chat,
+                                            &msg_link.source,
+                                        ))
+                                        .await?;
+                                    chat
+                                }
+                                None => {
+                                    // 查不到chat，放弃，搞下一个link
+                                    warn!("查询未找到群组名 >> {}", chat_name);
+                                    continue;
+                                }
+                            };
+                            // 限制resolve频率
+                            rate_limit.tick().await;
+                            chat
                         };
-                        // 限制resolve频率
-                        rate_limit.tick().await;
-                        chat
-                    };
 
-                    // 让子进程完成消息提取
-                    chat_send
-                        .send(ChatMessageExt::new(chat, msg_link.msg_id, msg_link.source))
-                        .await?;
+                        // 让子进程完成消息提取
+                        chat_send
+                            .send(ChatMessageExt::new(chat, msg_link.msg_id, msg_link.source))
+                            .await?;
+                    }
                 }
             }
         }
@@ -123,6 +128,7 @@ impl AddChat {
 
         // 但凡channel存在
         while let Some(chat_msg) = chat_recv.recv().await {
+            info!("接收消息链接 > id >> {}", chat_msg.msg_id);
             // 解包数据
             let chat = &chat_msg.chat;
             let msg_id = chat_msg.msg_id;

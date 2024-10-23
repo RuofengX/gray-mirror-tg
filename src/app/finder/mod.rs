@@ -40,7 +40,7 @@ pub struct Finder {
 
 impl Display for Finder {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.write_str("搜索")?;
+        f.write_str("关键词搜索")?;
         Ok(())
     }
 }

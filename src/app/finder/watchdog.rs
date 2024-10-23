@@ -1,19 +1,17 @@
-use std::{fmt::Display, sync::Arc, time::Duration};
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::Result;
-use tokio::{sync::RwLock, time::Instant};
+use tokio::{sync::Mutex, time::Instant};
 use tracing::{info, info_span, warn};
 
-use crate::context::{Context, BOT_RESEND_FREQ};
+use crate::context::{Context, BOT_RESEND_FREQ, BOT_RESP_TIMEOUT};
 
 use super::engine::Engine;
-
-const TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct Watchdog {
     engine: Engine,
     keyword: &'static str,
-    last_update: Arc<RwLock<Instant>>,
+    last_update: Arc<Mutex<Instant>>,
 }
 
 impl Display for Watchdog {
@@ -24,7 +22,7 @@ impl Display for Watchdog {
 }
 
 impl Watchdog {
-    pub fn new(engine: Engine, keyword: &'static str, last_update: Arc<RwLock<Instant>>) -> Self {
+    pub fn new(engine: Engine, keyword: &'static str, last_update: Arc<Mutex<Instant>>) -> Self {
         Watchdog {
             engine,
             keyword,
@@ -42,13 +40,14 @@ impl Watchdog {
         let mut freq_limit = tokio::time::interval(BOT_RESEND_FREQ);
         loop {
             freq_limit.tick().await;
-            let last = self.last_update.read().await;
-            if tokio::time::Instant::now() - *last > TIMEOUT {
+            let mut last = self.last_update.lock().await;
+            if tokio::time::Instant::now() - *last > BOT_RESP_TIMEOUT {
                 warn!("超时 > {}", self);
                 info!("发送消息");
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)
                     .await?;
+                *last = tokio::time::Instant::now();
             }
         }
     }

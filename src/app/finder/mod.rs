@@ -13,7 +13,7 @@ use anyhow::Result;
 use engine::Engine;
 use sea_orm::Set;
 use soso::SosoScraper;
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 
 use super::{App, Updater};
 
@@ -59,7 +59,7 @@ impl App for Finder {
             let source = Source::from_search(&search);
 
             // 时间同步量
-            let time_sync = Arc::new(RwLock::new(tokio::time::Instant::now()));
+            let time_sync = Arc::new(Mutex::new(tokio::time::Instant::now()));
 
             // 启动WD
             let watchdog = watchdog::Watchdog::new(self.engine, key, time_sync.clone());

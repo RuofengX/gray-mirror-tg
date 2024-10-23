@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::{sync::RwLock, time::Instant};
+use tokio::{sync::Mutex, time::Instant};
 use tracing::info_span;
 
 use super::engine::Engine;
@@ -18,7 +18,7 @@ pub struct SosoScraper {
     pub keyword: &'static str,
     pub source: Source,
     pub engine: Engine,
-    last_update: Arc<RwLock<Instant>>,
+    last_update: Arc<Mutex<Instant>>,
 }
 
 impl SosoScraper {
@@ -27,7 +27,7 @@ impl SosoScraper {
         _context: Context,
         keyword: &'static str,
         source: Source,
-        last_update: Arc<RwLock<Instant>>,
+        last_update: Arc<Mutex<Instant>>,
     ) -> Self {
         SosoScraper {
             keyword,
@@ -75,10 +75,8 @@ impl Updater for SosoScraper {
             }
         }
 
-        let mut last = self.last_update.write().await;
+        let mut last = self.last_update.lock().await;
         *last = Instant::now();
-
-        // TODO
 
         Ok(())
     }

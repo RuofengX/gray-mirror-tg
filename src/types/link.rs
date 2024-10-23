@@ -15,6 +15,7 @@ pub struct Model {
     pub source: SourceType,
     pub source_id: i64,
 }
+// TODO: 加一个check_at字段，超过一段时间就再检查一遍
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}

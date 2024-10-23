@@ -58,7 +58,7 @@ impl AddChat {
                         .map(|link| ChatMessage::try_from(link))
                         .filter_map(|x| {
                             if let Err(e) = &x {
-                                warn!("链接转换失败 >> {}", e);
+                                warn!("链接转换失败 > {}", e);
                             }
                             x.ok()
                         })

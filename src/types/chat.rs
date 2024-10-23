@@ -33,7 +33,6 @@ pub struct Model {
     pub chat_id: i64,
     pub ty: ChatType,
     pub username: String,
-    #[sea_orm(column_type = "Binary(17)")]
     pub packed: String,
     pub source: SourceType,
     pub source_id: i64,

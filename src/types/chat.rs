@@ -1,3 +1,5 @@
+use anyhow::Result;
+use grammers_client::types::PackedChat;
 use sea_orm::{entity::prelude::*, Set};
 use serde::{Deserialize, Serialize};
 
@@ -28,11 +30,11 @@ impl From<&grammers_client::types::Chat> for ChatType {
 #[sea_orm(table_name = "chat")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i64,
-    pub ty: ChatType,
-    pub name: String,
-    #[sea_orm(unique)]
     pub chat_id: i64,
+    pub ty: ChatType,
+    pub username: String,
+    #[sea_orm(column_type = "Binary(17)")]
+    pub packed: String,
     pub source: SourceType,
     pub source_id: i64,
 }
@@ -46,12 +48,18 @@ impl ActiveModel {
     pub fn from_chat(chat: &grammers_client::types::Chat, source: &Source) -> Self {
         Self {
             ty: Set(chat.into()),
-            name: Set(chat.name().to_string()), 
-            todo!("匹配Chat，返回username，而不是title")//
+            username: Set(chat.name().to_string()),
             chat_id: Set(chat.id()),
+            packed: Set(chat.pack().to_hex()),
             source: Set(source.ty),
             source_id: Set(source.id),
             ..Default::default()
         }
+    }
+}
+
+impl Model {
+    pub fn to_packed(&self) -> Result<PackedChat> {
+        Ok(PackedChat::from_hex(&self.packed)?)
     }
 }

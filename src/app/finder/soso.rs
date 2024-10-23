@@ -53,9 +53,9 @@ impl Updater for SosoScraper {
 
         let msg_id = context
             .persist
-            .put_message(message::ActiveModel::from_msg(&msg, &self.source))
+            .put_message(message::ActiveModel::from_msg(&msg.inner, self.source))
             .await?
-            .id;
+            .msg_id;
 
         let link_source = Source::from_message(msg_id);
         for link in msg.links() {

@@ -19,8 +19,9 @@ use crate::{
     persist::Database,
 };
 
-pub const RESOLVE_USER_NAME_FREQ: Duration = std::time::Duration::fromsecs(5);
-pub const BOT_MSG_FREQ: Duration = Duration::from_secs(30);
+pub const RESOLVE_USER_NAME_FREQ: Duration = std::time::Duration::from_secs(5);
+pub const UNPACK_MSG_FREQ: Duration = std::time::Duration::from_secs(5);
+pub const BOT_RESEND_FREQ: Duration = std::time::Duration::from_secs(30);
 
 pub struct ContextInner {
     pub client: Client,

@@ -4,11 +4,11 @@ use anyhow::Result;
 use tokio::{sync::RwLock, time::Instant};
 use tracing::{info, info_span, warn};
 
-use crate::context::Context;
+use crate::context::{Context, BOT_RESEND_FREQ};
 
 use super::engine::Engine;
 
-const TIMEOUT: Duration = Duration::from_secs(30);
+const TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct Watchdog {
     engine: Engine,
@@ -39,8 +39,9 @@ impl Watchdog {
         ctx.client
             .send_message(self.engine.chat, self.keyword)
             .await?;
+        let mut freq_limit = tokio::time::interval(BOT_RESEND_FREQ);
         loop {
-            tokio::time::sleep(TIMEOUT).await;
+            freq_limit.tick().await;
             let last = self.last_update.read().await;
             if tokio::time::Instant::now() - *last > TIMEOUT {
                 warn!("超时 > {}", self);
@@ -48,7 +49,6 @@ impl Watchdog {
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)
                     .await?;
-
             }
         }
     }

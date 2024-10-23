@@ -1,6 +1,6 @@
 //! [`link::Model`] -> [`LinkIter`] -> [`link::Model`] -> [`ChatMessage`]
-//! -> Updater get [`chat::ActiveModel`], persist
-//! -> Updater get [`message::ActiveModel`], persist
+//! -> Updater get [`types::chat::ActiveModel`], persist
+//! -> Updater get [`types::message::ActiveModel`], persist
 //! -> Updater join group
 
 use std::collections::VecDeque;
@@ -38,7 +38,7 @@ impl<'db> LinkIter<'db> {
 
 #[derive(Debug)]
 pub struct ChatMessage {
-    pub name: String,
+    pub username: String,
     pub msg_id: i32,
     pub source: Source,
 }
@@ -48,8 +48,8 @@ impl TryFrom<link::Model> for ChatMessage {
     fn try_from(value: link::Model) -> Result<Self> {
         let url = Url::parse(&value.link)?;
         let mut path = url.path_segments().ok_or(anyhow!("[0]未找到路径"))?;
-        let name = path.next().ok_or(anyhow!("[1]未找到聊天名"))?.to_string(); // TODO: 处理这些路径
-        if name.starts_with("+") {
+        let username = path.next().ok_or(anyhow!("[1]未找到聊天名"))?.to_string(); // TODO: 处理这些路径
+        if username.starts_with("+") {
             bail!("[1]是邀请链接")
         }
         let msg_id = path
@@ -58,10 +58,25 @@ impl TryFrom<link::Model> for ChatMessage {
             .parse::<i32>()
             .map_err(|_| anyhow!("[2]不是消息号码"))?;
         let rtn = ChatMessage {
-            name,
+            username,
             msg_id,
             source: Source::from_link(&value),
         };
         Ok(rtn)
+    }
+}
+
+pub struct ChatMessageExt {
+    pub chat: grammers_client::types::Chat,
+    pub msg_id: i32,
+    pub source: Source,
+}
+impl ChatMessageExt {
+    pub fn new(chat: grammers_client::types::Chat, msg_id: i32, source: Source) -> Self {
+        Self {
+            chat,
+            msg_id,
+            source,
+        }
     }
 }

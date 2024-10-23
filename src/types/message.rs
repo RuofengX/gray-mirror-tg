@@ -123,9 +123,10 @@ impl MessageExt {
 #[sea_orm(table_name = "message")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32, // get raw id
-    pub message: String,
+    pub chat_id: i64,
+    #[sea_orm(primary_key)]
     pub msg_id: i32,
+    pub message: String,
     pub raw: Json,
     pub source: SourceType,
     pub source_id: i64,
@@ -138,11 +139,12 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
-    pub fn from_msg(msg: &MessageExt, source: &Source) -> Self {
-        let raw = Set(serde_json::to_value(&msg.inner.raw).unwrap());
+    pub fn from_msg(msg: &grammers_client::types::Message, source: Source) -> Self {
+        let raw = Set(serde_json::to_value(&msg.raw).unwrap());
         Self {
-            message: Set(msg.inner.raw.message.clone()),
-            msg_id: Set(msg.inner.id()),
+            chat_id: Set(msg.chat().id()),
+            msg_id: Set(msg.id()),
+            message: Set(msg.raw.message.clone()),
             raw,
             source: Set(source.ty),
             source_id: Set(source.id),

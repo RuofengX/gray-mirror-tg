@@ -2,9 +2,9 @@ use anyhow::Result;
 use dotenv_codegen::dotenv;
 use sea_orm::{
     sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait,
-    DatabaseConnection, EntityTrait, QueryFilter, Schema,
+    DatabaseConnection, EntityTrait, QueryFilter, Schema, TransactionTrait,
 };
-use tracing::{debug, info, info_span};
+use tracing::{debug, info_span};
 
 use crate::types::{chat, link, message, search};
 
@@ -60,53 +60,32 @@ impl Database {
     }
 
     pub async fn put_message(&self, data: message::ActiveModel) -> Result<message::Model> {
-        // TODO: 使用msg的uuid去重
         let span = info_span!("提交消息");
         let _span = span.enter();
 
         debug!("传入 >> {:?}", data);
-        let rtn = data.insert(&self.db).await?;
-        Ok(rtn)
-    }
 
-    pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
-        let span = info_span!("提交链接");
-        let _span = span.enter();
+        let trans = self.db.begin().await?;
 
-        debug!("传入 >> {:?}", data);
-        let exist = link::Entity::find()
-            .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
-            .one(&self.db)
+        let exist = message::Entity::find()
+            .filter(message::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
+            .filter(message::Column::MsgId.eq(data.msg_id.clone().into_value().unwrap()))
+            .one(&trans)
             .await?;
         if let Some(exist) = exist {
             Ok(exist)
         } else {
-            let rtn = link::Entity::insert(data)
-                .on_conflict(
-                    OnConflict::column(link::Column::Link)
-                        .do_nothing()
-                        .to_owned(),
-                )
-                .exec_with_returning(&self.db)
-                .await?;
+            let rtn = data.insert(&trans).await?;
             Ok(rtn)
         }
-    }
-
-    pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {
-        let span = info_span!("提交搜索");
-        let _span = span.enter();
-
-        debug!("传入 >> {:?}", data);
-        let rtn = data.insert(&self.db).await?;
-        Ok(rtn)
     }
 
     pub async fn put_chat(&self, data: chat::ActiveModel) -> Result<chat::Model> {
         let span = info_span!("提交群组");
         let _span = span.enter();
 
-        info!("传入 >> {:?}", data);
+        debug!("传入 >> {:?}", data);
+
         let exist = chat::Entity::find()
             .filter(chat::Column::ChatId.eq(data.chat_id.clone().unwrap()))
             .one(&self.db)
@@ -126,16 +105,42 @@ impl Database {
         }
     }
 
-    pub async fn chat_name_duplicate(&self, name: &str) -> Result<bool> {
-        let span = info_span!("查重群组名");
+    pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
+        let span = info_span!("提交链接");
         let _span = span.enter();
 
-        debug!("传入 >> {:?}", name);
+        debug!("传入 >> {:?}", data);
+        let exist = link::Entity::find()
+            .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
+            .one(&self.db)
+            .await?;
+        if let Some(exist) = exist {
+            Ok(exist)
+        } else {
+            let rtn = data.insert(&self.db).await?;
+            Ok(rtn)
+        }
+    }
+
+    pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {
+        let span = info_span!("提交搜索");
+        let _span = span.enter();
+
+        debug!("传入 >> {:?}", data);
+        let rtn = data.insert(&self.db).await?;
+        Ok(rtn)
+    }
+
+    pub async fn find_chat(&self, username: &str) -> Result<Option<chat::Model>> {
+        let span = info_span!("查询群组名");
+        let _span = span.enter();
+
+        debug!("传入 >> {:?}", username);
         let rtn = chat::Entity::find()
-            .filter(chat::Column::Name.eq(name))
+            .filter(chat::Column::Username.eq(username))
             .one(&self.db)
             .await?;
 
-        Ok(rtn.is_some())
+        Ok(rtn)
     }
 }

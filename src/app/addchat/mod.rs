@@ -1,16 +1,17 @@
-use std::{fmt::Display, time::Duration};
+use std::fmt::Display;
 
 use anyhow::Result;
 use sea_orm::{EntityTrait, PaginatorTrait};
-use tracing::{info, warn};
+use tokio::sync::mpsc::Sender;
+use tracing::{info, info_span, warn};
 
 use crate::{
-    context::Context,
+    context::{Context, RESOLVE_USER_NAME_FREQ, UNPACK_MSG_FREQ},
     types::{chat, link, message},
 };
 
 use super::App;
-use convert::ChatMessage;
+use convert::{ChatMessage, ChatMessageExt};
 
 pub mod convert;
 
@@ -18,17 +19,35 @@ pub struct AddChat {}
 
 impl Display for AddChat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        "添加群组".fmt(f)
+        Self::NAME.fmt(f)
+    }
+}
+impl App for AddChat {
+    async fn ignite(&mut self, context: Context) -> Result<()> {
+        let (s, r) = tokio::sync::mpsc::channel(64);
+        context
+            .add_background_task("链接消息提取", Self::fetch_message(context.clone(), r))
+            .await;
+        context
+            .add_background_task("群组探针", Self::fetch_group(context.clone(), s))
+            .await;
+        Ok(())
     }
 }
 
 impl AddChat {
+    const NAME: &str = "添加群组";
     pub fn new() -> Self {
         Self {}
     }
-    pub async fn background_tast(context: Context) -> Result<()> {
+    async fn fetch_group(context: Context, chat_send: Sender<ChatMessageExt>) -> Result<()> {
+        let group_span = info_span!("获取群组");
+        let _span = group_span.enter();
+
         let db = &context.persist.db;
         let mut link_iter = link::Entity::find().paginate(db, 1024);
+        let mut rate_limit = tokio::time::interval(RESOLVE_USER_NAME_FREQ);
+
         loop {
             // 从数据库获取一批链接
             if let Some(links) = link_iter.fetch_and_next().await? {
@@ -44,60 +63,83 @@ impl AddChat {
                     })
                     .collect();
 
+                // 遍历link
                 for msg_link in msg_link_vec {
-                    let chat_name = &msg_link.name; // 群组名
+                    let chat_name = &msg_link.username; // 群组名
 
-                    // 获取群组chat实例
-                    match context.client.resolve_username(chat_name).await? {
-                        // 成功打开chat
-                        Some(chat) => {
-                            // 判断是否已采集
-                            if context.persist.chat_name_duplicate(chat_name).await? {
-                                info!("已采集群组名 >> {}", chat_name);
-                            } else {
-                                info!("新采集群组名 >> {}", chat_name);
-                                let _ = context
+                    // 获取chat::Model
+                    // 判断是否已采集，避免频繁调用resolve_username
+                    let chat = if let Some(chat) = context.persist.find_chat(chat_name).await? {
+                        // 已采集
+                        info!("已采集群组名 >> {}", chat_name);
+
+                        // 从Model读取PackedChat
+                        let packed_chat = chat.to_packed()?;
+                        // 用Client解包PackedChat，并返回
+                        context.client.unpack_chat(packed_chat).await?
+                    } else {
+                        // 未采集
+                        info!("新采集群组名 >> {}", chat_name);
+                        let chat = match context.client.resolve_username(chat_name).await? {
+                            Some(chat) => {
+                                // 成功打开chat
+                                // 存入数据库，返回chat::Model
+                                context
                                     .persist
                                     .put_chat(chat::ActiveModel::from_chat(&chat, &msg_link.source))
                                     .await?;
-                                let msg = &context
-                                    .client
-                                    .get_messages_by_id(chat, &[msg_link.msg_id])
-                                    .await?[0];
-                                if let Some(msg) = msg {
-                                    context
-                                        .persist
-                                        .put_message(message::ActiveModel::from_msg(
-                                            &msg.into(),
-                                            &msg_link.source,
-                                        ))
-                                        .await?;
-                                } else {
-                                    info!("未找到消息 >> {:?}", msg_link);
-                                }
+                                chat
                             }
-                        }
-                        None => {
-                            warn!("查询未找到群组名 >> {}", chat_name);
-                        }
+                            None => {
+                                // 查不到chat，放弃，搞下一个link
+                                warn!("查询未找到群组名 >> {}", chat_name);
+                                continue;
+                            }
+                        };
+                        // 限制resolve频率
+                        rate_limit.tick().await;
+                        chat
                     };
 
-                    // 限制resolve频率
-                    tokio::time::sleep(Duration::from_secs(30)).await;
+                    // 让子进程完成消息提取
+                    chat_send
+                        .send(ChatMessageExt::new(chat, msg_link.msg_id, msg_link.source))
+                        .await?;
                 }
             }
         }
     }
-}
 
-impl App for AddChat {
-    async fn ignite(&mut self, context: crate::context::Context) -> Result<()> {
-        context
-            .add_background_task(
-                &format!("{}", &self),
-                Self::background_tast(context.clone()),
-            )
-            .await;
+    /// 后台获取具体msg
+    async fn fetch_message(
+        context: Context,
+        mut chat_recv: tokio::sync::mpsc::Receiver<ChatMessageExt>,
+    ) -> Result<()> {
+        let group_span = info_span!("获取消息");
+        let _span = group_span.enter();
+
+        // 限制解包频率
+        let mut rate_limit = tokio::time::interval(UNPACK_MSG_FREQ);
+
+        // 但凡channel存在
+        while let Some(chat_msg) = chat_recv.recv().await {
+            // 解包数据
+            let chat = &chat_msg.chat;
+            let msg_id = chat_msg.msg_id;
+            let source = chat_msg.source;
+
+            // 从chat提取消息
+            if let Some(msg) = &context.client.get_messages_by_id(chat, &[msg_id]).await?[0] {
+                // 存储msg
+                context
+                    .persist
+                    .put_message(message::ActiveModel::from_msg(&msg, source))
+                    .await?;
+                rate_limit.tick().await;
+            } else {
+                info!("未找到消息 >> {:?}", msg_id);
+            }
+        }
         Ok(())
     }
 }

@@ -26,7 +26,7 @@ pub enum SourceType {
     // TODO: 添加群组爬虫的来源
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Source {
     pub ty: SourceType,
     pub id: i64,

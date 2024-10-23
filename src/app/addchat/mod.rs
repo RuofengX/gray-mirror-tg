@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 use tracing::{debug, info, info_span, warn};
 
 use crate::{
-    context::{Context, RESOLVE_USER_NAME_FREQ, UNPACK_MSG_FREQ},
+    context::{Context, RESOLVE_USER_NAME_FREQ, FIND_MSG_FREQ},
     types::{chat, link, message},
 };
 
@@ -131,7 +131,7 @@ impl AddChat {
         let _span = group_span.enter();
 
         // 限制解包频率
-        let mut rate_limit = tokio::time::interval(UNPACK_MSG_FREQ);
+        let mut rate_limit = tokio::time::interval(FIND_MSG_FREQ);
 
         // 但凡channel存在
         while let Some(chat_msg) = chat_recv.recv().await {

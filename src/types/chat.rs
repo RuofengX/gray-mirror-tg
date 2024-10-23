@@ -33,6 +33,7 @@ pub struct Model {
     pub chat_id: i64,
     pub ty: ChatType,
     pub username: String,
+    pub name: String,
     pub packed: String,
     pub source: SourceType,
     pub source_id: i64,
@@ -46,9 +47,10 @@ impl ActiveModelBehavior for ActiveModel {}
 impl ActiveModel {
     pub fn from_chat(chat: &grammers_client::types::Chat, source: &Source) -> Self {
         Self {
-            ty: Set(chat.into()),
-            username: Set(chat.name().to_string()),
             chat_id: Set(chat.id()),
+            ty: Set(chat.into()),
+            username: Set(chat.username().unwrap_or_default().to_string()),
+            name: Set(chat.name().to_string()),
             packed: Set(chat.pack().to_hex()),
             source: Set(source.ty),
             source_id: Set(source.id),

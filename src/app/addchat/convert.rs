@@ -7,6 +7,7 @@ use std::collections::VecDeque;
 
 use anyhow::{anyhow, bail, Result};
 use sea_orm::{DbConn, EntityTrait, Paginator, PaginatorTrait, SelectModel};
+use tracing::info_span;
 use url::Url;
 
 use crate::types::{link, Source};
@@ -46,7 +47,10 @@ impl TryFrom<link::Model> for ChatMessage {
     type Error = anyhow::Error;
 
     fn try_from(value: link::Model) -> Result<Self> {
+        let from_span = info_span!("处理链接", url = value.link);
         let url = Url::parse(&value.link)?;
+        let _span = from_span.enter();
+
         let mut path = url.path_segments().ok_or(anyhow!("[0]未找到路径"))?;
         let username = path.next().ok_or(anyhow!("[1]未找到聊天名"))?.to_string(); // TODO: 处理这些路径
         if username.starts_with("+") {

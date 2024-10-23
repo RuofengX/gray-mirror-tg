@@ -23,6 +23,11 @@ impl Display for MessageExt {
     }
 }
 
+impl From<grammers_client::types::Message> for MessageExt {
+    fn from(value: grammers_client::types::Message) -> Self {
+        MessageExt { inner: value }
+    }
+}
 impl From<&grammers_client::types::Message> for MessageExt {
     fn from(value: &grammers_client::types::Message) -> Self {
         MessageExt {

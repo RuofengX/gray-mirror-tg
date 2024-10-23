@@ -21,13 +21,14 @@ pub mod engine;
 pub mod soso;
 pub mod watchdog;
 
-pub const KEYWORDS: [&str; 6] = [
-    "KK园区",
-    "世纪园区",
-    "金州园区",
-    "金帝园区",
-    "东风园区",
-    "担保",
+pub const KEYWORDS: [&str; 1] = [
+    "柏盛",
+    // "KK园区",
+    // "世纪园区",
+    // "金州园区",
+    // "金帝园区",
+    // "东风园区",
+    // "担保",
 ];
 pub const SEARCH_ENGINE: &str = "SOSO";
 // TODO: Add bot list
@@ -77,7 +78,7 @@ impl App for Finder {
                     source,
                     time_sync.clone(),
                 ))
-                .await;
+                .await?;
 
             tokio::time::sleep(Duration::from_secs(5)).await;
         }

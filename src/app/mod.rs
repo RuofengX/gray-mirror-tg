@@ -13,9 +13,10 @@ use crate::{context::Context, types::MessageExt};
 
 /// 简单的范用应用
 pub mod generic;
-
 /// 利用soso等机器人挖掘关联群组
 pub mod finder;
+/// 自动添加群组、频道
+pub mod addchat;
 
 pub trait App: Display + Send + Sync {
     /// 初始化数据

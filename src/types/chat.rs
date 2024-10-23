@@ -1,7 +1,7 @@
 use sea_orm::{entity::prelude::*, Set};
 use serde::{Deserialize, Serialize};
 
-use super::{MessageExt, Source, SourceType};
+use super::{Source, SourceType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::None)")]
@@ -43,10 +43,9 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
-    pub fn from_msg(msg: &MessageExt, source: &Source) -> Self {
-        let chat = msg.inner.chat();
+    pub fn from_chat(chat: &grammers_client::types::Chat, source: &Source) -> Self {
         Self {
-            ty: Set((&chat).into()),
+            ty: Set(chat.into()),
             name: Set(chat.name().to_string()),
             chat_id: Set(chat.id()),
             source: Set(source.ty),

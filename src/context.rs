@@ -85,7 +85,7 @@ impl Context {
         Ok(())
     }
 
-    pub async fn add_updater(&self, updater: impl Updater + 'static) -> () {
+    pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()>{
         let name = format!("{}", &updater);
         let update_span = info_span!("更新器", name);
 
@@ -94,12 +94,10 @@ impl Context {
 
         self.add_background_task(
             &format!("{}", runtime),
-            async move {
-                runtime.run().await
-            }
-            .instrument(update_span),
+            async move { runtime.run().await }.instrument(update_span),
         )
         .await;
+        Ok(())
     }
 
     pub async fn add_background_task(
@@ -118,7 +116,7 @@ impl Context {
         );
     }
 
-    pub async fn start_listen_updates(&mut self) -> () {
+    pub async fn enable_update(self) -> Result<Self> {
         let client = self.client.clone();
         let sender = self.update_sender.clone();
 
@@ -130,6 +128,7 @@ impl Context {
             }
         })
         .await;
+        Ok(self)
     }
 
     /// Run until error occurs. Return first error.

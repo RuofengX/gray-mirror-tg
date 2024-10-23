@@ -10,9 +10,9 @@ use crate::{
 };
 
 use super::App;
-use iter::ChatMessage;
+use convert::ChatMessage;
 
-pub mod iter;
+pub mod convert;
 
 pub struct AddChat {}
 

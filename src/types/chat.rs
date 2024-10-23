@@ -46,7 +46,8 @@ impl ActiveModel {
     pub fn from_chat(chat: &grammers_client::types::Chat, source: &Source) -> Self {
         Self {
             ty: Set(chat.into()),
-            name: Set(chat.name().to_string()),
+            name: Set(chat.name().to_string()), 
+            todo!("匹配Chat，返回username，而不是title")//
             chat_id: Set(chat.id()),
             source: Set(source.ty),
             source_id: Set(source.id),

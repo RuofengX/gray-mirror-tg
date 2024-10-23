@@ -80,7 +80,7 @@ impl AddChat {
                             context.client.unpack_chat(packed_chat).await?
                         } else {
                             // 未采集
-                            info!("新采集群组名 >> {}", chat_name);
+                            warn!("新采集群组名 >> {}", chat_name);
                             let chat = match context.client.resolve_username(chat_name).await? {
                                 Some(chat) => {
                                     // 成功打开chat

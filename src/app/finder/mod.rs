@@ -21,14 +21,14 @@ pub mod engine;
 pub mod soso;
 pub mod watchdog;
 
-pub const KEYWORDS: [&str; 1] = [
+pub const KEYWORDS: [&str; 3] = [
     "柏盛",
-    // "KK园区",
+    "园区",
+    "担保",
     // "世纪园区",
     // "金州园区",
     // "金帝园区",
     // "东风园区",
-    // "担保",
 ];
 pub const SEARCH_ENGINE: &str = "SOSO";
 // TODO: Add bot list

@@ -105,7 +105,7 @@ impl AddChat {
                                 .put_chat(chat::ActiveModel::from_chat(&chat, &msg_link.source))
                                 .await?;
 
-                            // 限制resolve频率
+                            // 限制unpack, resolve频率
                             rate_limit.tick().await;
 
                             // 返回chat，之后存入channel

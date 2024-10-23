@@ -3,7 +3,7 @@ use std::fmt::Display;
 use anyhow::Result;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::sync::mpsc::Sender;
-use tracing::{info, info_span, warn};
+use tracing::{debug, info, info_span, warn};
 
 use crate::{
     context::{Context, RESOLVE_USER_NAME_FREQ, UNPACK_MSG_FREQ},
@@ -81,31 +81,38 @@ impl AddChat {
                         } else {
                             // 未采集
                             warn!("新采集群组名 >> {}", chat_name);
-                            let chat = match context.client.resolve_username(chat_name).await? {
-                                Some(chat) => {
-                                    // 成功打开chat
-                                    // 存入数据库，返回chat::Model
-                                    context
-                                        .persist
-                                        .put_chat(chat::ActiveModel::from_chat(
-                                            &chat,
-                                            &msg_link.source,
-                                        ))
-                                        .await?;
-                                    chat
-                                }
-                                None => {
-                                    // 查不到chat，放弃，搞下一个link
-                                    warn!("查询未找到群组名 >> {}", chat_name);
-                                    continue;
-                                }
-                            };
+                            let chat = context.client.resolve_username(chat_name).await;
+                            if matches!(chat, Err(_)) {
+                                // 查不到chat出错，放弃，搞下一个link
+                                warn!(
+                                    "查询群组名出错 > {} >> {}",
+                                    chat_name,
+                                    chat.expect_err("已检查")
+                                );
+                                continue;
+                            }
+                            let chat = chat.expect("已检查");
+                            if matches!(chat, None) {
+                                // 查不到chat，放弃，搞下一个link
+                                warn!("查询未找到群组名 >> {}", chat_name);
+                                continue;
+                            }
+                            let chat = chat.expect("已检查");
+                            // 成功打开chat
+                            // 存入数据库，返回chat::Model
+                            context
+                                .persist
+                                .put_chat(chat::ActiveModel::from_chat(&chat, &msg_link.source))
+                                .await?;
+
                             // 限制resolve频率
                             rate_limit.tick().await;
+
+                            // 返回chat，之后存入channel
                             chat
                         };
 
-                        // 让子进程完成消息提取
+                        // 存入channel，让子进程完成消息提取
                         chat_send
                             .send(ChatMessageExt::new(chat, msg_link.msg_id, msg_link.source))
                             .await?;
@@ -128,7 +135,7 @@ impl AddChat {
 
         // 但凡channel存在
         while let Some(chat_msg) = chat_recv.recv().await {
-            info!("接收消息链接 > id >> {}", chat_msg.msg_id);
+            debug!("接收消息链接 > id >> {}", chat_msg.msg_id);
             // 解包数据
             let chat = &chat_msg.chat;
             let msg_id = chat_msg.msg_id;
@@ -137,13 +144,14 @@ impl AddChat {
             // 从chat提取消息
             if let Some(msg) = &context.client.get_messages_by_id(chat, &[msg_id]).await?[0] {
                 // 存储msg
+                info!("找到消息 >> {}@{}", msg_id, chat.id());
                 context
                     .persist
                     .put_message(message::ActiveModel::from_msg(&msg, source))
                     .await?;
                 rate_limit.tick().await;
             } else {
-                info!("未找到消息 >> {:?}", msg_id);
+                info!("未找到消息 >> {}@{}", msg_id, chat.id());
             }
         }
         Ok(())

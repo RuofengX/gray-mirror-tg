@@ -2,7 +2,7 @@ use anyhow::Result;
 use dotenv_codegen::dotenv;
 use sea_orm::{
     sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait,
-    DatabaseConnection, EntityTrait, QueryFilter, Schema, TransactionTrait,
+    DatabaseConnection, EntityTrait, QueryFilter, Schema,
 };
 use tracing::{debug, info_span};
 
@@ -65,17 +65,15 @@ impl Database {
 
         debug!("传入 >> {:?}", data);
 
-        let trans = self.db.begin().await?;
-
         let exist = message::Entity::find()
             .filter(message::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
             .filter(message::Column::MsgId.eq(data.msg_id.clone().into_value().unwrap()))
-            .one(&trans)
+            .one(&self.db)
             .await?;
         if let Some(exist) = exist {
             Ok(exist)
         } else {
-            let rtn = data.insert(&trans).await?;
+            let rtn = data.insert(&self.db).await?;
             Ok(rtn)
         }
     }

@@ -1,4 +1,4 @@
-use std::{future::Future, ops::Deref, sync::Arc};
+use std::{future::Future, ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
@@ -11,14 +11,16 @@ use tokio::{
     task::JoinSet,
 };
 use tracing::{info, info_span, level_filters::STATIC_MAX_LEVEL, trace, Instrument};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
     app::{App, UpdateRuntime, Updater},
     persist::Database,
 };
+
+pub const RESOLVE_USER_NAME_FREQ: Duration = std::time::Duration::fromsecs(5);
+pub const BOT_MSG_FREQ: Duration = Duration::from_secs(30);
 
 pub struct ContextInner {
     pub client: Client,
@@ -85,7 +87,7 @@ impl Context {
         Ok(())
     }
 
-    pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()>{
+    pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()> {
         let name = format!("{}", &updater);
         let update_span = info_span!("更新器", name);
 

@@ -39,6 +39,7 @@ impl Updater for GrayMirror {
             .persist
             .put_message(message::ActiveModel::from_inner_msg(&msg.inner, source))
             .await?;
+        msg.inner.mark_as_read().await?;
         Ok(())
     }
 

@@ -78,7 +78,7 @@ impl Updater for SosoScraper {
         let mut last = self.last_update.lock().await;
         *last = Instant::now();
 
-        msg.inner.mark_as_read().await?;
+        msg.inner.mark_as_read().await.ok();
 
         Ok(())
     }

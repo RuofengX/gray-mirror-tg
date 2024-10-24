@@ -1,6 +1,9 @@
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use sea_orm::{prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, Schema, Statement};
+use sea_orm::{
+    prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, Schema, Statement,
+    TransactionTrait,
+};
 use tracing::{debug, info_span, instrument, Level};
 
 use crate::types::{chat, link, message, search};
@@ -61,17 +64,22 @@ impl Database {
         let span = info_span!("提交消息");
         let _span = span.enter();
 
-        let exist = message::Entity::find()
-            .filter(message::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
-            .filter(message::Column::MsgId.eq(data.msg_id.clone().into_value().unwrap()))
-            .one(&self.db)
+        let chat_id = data.chat_id.clone().unwrap();
+        let msg_id = data.msg_id.clone().unwrap();
+
+        let trans = self.db.begin().await?;
+        let _ = message::Entity::insert(data)
+            .on_conflict_do_nothing()
+            .exec(&trans)
             .await?;
-        if let Some(exist) = exist {
-            Ok(exist)
-        } else {
-            let rtn = data.insert(&self.db).await?;
-            Ok(rtn)
-        }
+
+        let rtn = message::Entity::find_by_id((chat_id, msg_id))
+            .one(&trans)
+            .await?
+            .expect("事务进行中");
+
+        trans.commit().await?;
+        Ok(rtn)
     }
 
     #[instrument(skip(self), level = Level::DEBUG)]

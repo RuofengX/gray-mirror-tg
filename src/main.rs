@@ -17,6 +17,7 @@ async fn main() -> Result<()> {
     let ctx = Context::new().await?;
 
     ctx.enable_update().await?;
+    ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
     ctx.add_app(app::finder::Finder::new(Engine::SOSO)).await?;
     ctx.add_app(app::addchat::AddChat::new()).await?;
     ctx.run().await?;

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use grammers_client::types::Message as RawMessage;
 use tracing::info;
 
 use crate::{
@@ -11,6 +12,9 @@ use crate::{
 pub struct GrayMirror;
 impl GrayMirror {
     const NAME: &str = "灰镜";
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 impl std::fmt::Display for GrayMirror {
@@ -20,7 +24,8 @@ impl std::fmt::Display for GrayMirror {
 }
 
 impl App for GrayMirror {
-    async fn ignite(&mut self, _context: crate::context::Context) -> anyhow::Result<()> {
+    async fn ignite(&mut self, context: crate::context::Context) -> anyhow::Result<()> {
+        context.add_updater(GrayMirror::new()).await?;
         Ok(())
     }
 }
@@ -41,5 +46,24 @@ impl Updater for GrayMirror {
     async fn message_edited(&mut self, context: Context, msg: MessageExt) -> Result<()> {
         self.message_recv(context.clone(), msg).await?;
         Ok(())
+    }
+
+    fn raw_msg_filter(&self, raw_msg: &RawMessage) -> bool {
+        let mut flag = true;
+
+        if self.filter_incoming() {
+            raw_msg.outgoing().then(|| flag = false);
+        }
+
+        match raw_msg.chat() {
+            grammers_client::types::Chat::User(u) => {
+                if u.is_bot() {
+                    flag = false;
+                }
+            }
+            _ => (),
+        }
+
+        flag
     }
 }

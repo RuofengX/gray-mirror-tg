@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Sender;
 use tracing::{debug, info, info_span, warn};
 
 use crate::{
-    context::{Context, FIND_MSG_FREQ, RESOLVE_USER_NAME_FREQ},
+    context::{Context, FIND_MSG_FREQ, RESOLVE_USER_NAME_FREQ, UNPACK_CHAT_FREQ},
     types::{chat, link, message},
 };
 
@@ -45,7 +45,8 @@ impl AddChat {
         let _span = group_span.enter();
 
         let db = &context.persist.db;
-        let mut rate_limit = tokio::time::interval(RESOLVE_USER_NAME_FREQ);
+        let mut resolve_rate_limit = tokio::time::interval(RESOLVE_USER_NAME_FREQ);
+        let mut unpack_rate_limit = tokio::time::interval(UNPACK_CHAT_FREQ);
 
         loop {
             // 从数据库获取一批链接
@@ -79,11 +80,16 @@ impl AddChat {
                         // 从Model读取PackedChat
                         let packed_chat = chat.to_packed()?;
                         // 用Client解包PackedChat，并返回
-                        context.client.unpack_chat(packed_chat).await?
+                        let chat = context.client.unpack_chat(packed_chat).await?;
+                        // 限制unpack频率
+                        unpack_rate_limit.tick().await;
+                        chat
                     } else {
                         // 未采集
                         warn!("新采集群组名 >> {}", chat_name);
                         let chat = context.client.resolve_username(chat_name).await;
+                        // 限制resolve频率
+                        resolve_rate_limit.tick().await;
                         if matches!(chat, Err(_)) {
                             // 查不到chat出错，放弃，搞下一个link
                             warn!(
@@ -106,9 +112,6 @@ impl AddChat {
                             .persist
                             .put_chat(chat::ActiveModel::from_chat(&chat, &msg_link.source))
                             .await?;
-
-                        // 限制unpack, resolve频率
-                        rate_limit.tick().await;
 
                         // 返回chat，之后存入channel
                         chat

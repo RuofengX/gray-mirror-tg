@@ -148,7 +148,7 @@ impl AddChat {
                 info!("找到消息 >> {}@{}", msg_id, chat.id());
                 context
                     .persist
-                    .put_message(message::ActiveModel::from_msg(&msg, source))
+                    .put_message(message::ActiveModel::from_inner_msg(&msg, source))
                     .await?;
                 rate_limit.tick().await;
             } else {

@@ -139,7 +139,7 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
-    pub fn from_msg(msg: &grammers_client::types::Message, source: Source) -> Self {
+    pub fn from_inner_msg(msg: &grammers_client::types::Message, source: Source) -> Self {
         let raw = Set(serde_json::to_value(&msg.raw).unwrap());
         Self {
             chat_id: Set(msg.chat().id()),

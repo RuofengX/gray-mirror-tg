@@ -17,6 +17,8 @@ pub mod generic;
 pub mod finder;
 /// 自动添加群组、频道
 pub mod addchat;
+/// 收集全量数据
+pub mod gray_mirror;
 
 pub trait App: Display + Send + Sync {
     /// 初始化数据

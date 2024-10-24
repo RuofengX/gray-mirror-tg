@@ -1,11 +1,10 @@
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
+pub mod chat;
 pub mod link;
 pub mod message;
 pub mod search;
-pub mod chat;
-
 
 pub use link::Model;
 pub use message::MessageExt;
@@ -23,6 +22,8 @@ pub enum SourceType {
     Message,
     #[sea_orm(string_value = "chat")]
     Chat,
+    #[sea_orm(string_value = "")]
+    Manual,
     // TODO: 添加群组爬虫的来源
 }
 
@@ -54,11 +55,17 @@ impl Source {
         }
     }
 
-    pub fn from_chat(chat_id: i64) -> Self{
+    pub fn from_chat(chat_id: i64) -> Self {
         Self {
             ty: SourceType::Chat,
             id: chat_id,
         }
+    }
 
+    pub fn from_manual() -> Self {
+        Self {
+            ty: SourceType::Manual,
+            id: -1,
+        }
     }
 }

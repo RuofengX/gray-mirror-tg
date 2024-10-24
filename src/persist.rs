@@ -129,7 +129,12 @@ impl Database {
     }
 
     #[instrument(skip(self), level = Level::DEBUG)]
-    pub async fn find_chat(&self, username: &str) -> Result<Option<chat::Model>> {
+    pub async fn find_chat(&self, username: Option<&str>) -> Result<Option<chat::Model>> {
+        if username.is_none(){
+            return Ok(None)
+        }
+        let username = username.unwrap();
+
         let raw_sql = Statement::from_sql_and_values(
             DbBackend::Postgres,
             r#"SELECT * FROM "chat" WHERE $1 = ANY("usernames")"#,

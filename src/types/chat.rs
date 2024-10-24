@@ -45,7 +45,7 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
-    pub fn from_chat(chat: &grammers_client::types::Chat, source: &Source) -> Self {
+    pub fn from_chat(chat: &grammers_client::types::Chat, source: Source) -> Self {
         let usernames = chat
             .username()
             .map(|username| vec![username])

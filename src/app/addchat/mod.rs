@@ -170,7 +170,7 @@ impl AddChat {
 
         // 获取chat::Model
         // 判断是否已采集，避免频繁调用resolve_username
-        let chat = if let Some(chat) = context.persist.find_chat(chat_name).await? {
+        let chat = if let Some(chat) = context.persist.find_chat(Some(chat_name)).await? {
             // 已采集
             info!("已采集群组名 >> {}", chat_name);
 
@@ -207,7 +207,7 @@ impl AddChat {
             // 存入数据库，返回chat::Model
             context
                 .persist
-                .put_chat(chat::ActiveModel::from_chat(&chat, &chat_msg.source))
+                .put_chat(chat::ActiveModel::from_chat(&chat, chat_msg.source))
                 .await?;
             chat
 
@@ -259,7 +259,7 @@ impl AddChat {
     ) -> Result<()> {
         if context
             .persist
-            .find_chat(&may_channel.username)
+            .find_chat(Some(&may_channel.username))
             .await?
             .is_some()
         {
@@ -279,7 +279,7 @@ impl AddChat {
 
             context
                 .persist
-                .put_chat(chat::ActiveModel::from_chat(&chat, &may_channel.source))
+                .put_chat(chat::ActiveModel::from_chat(&chat, may_channel.source))
                 .await?;
             context.client.join_chat(chat).await?;
         }

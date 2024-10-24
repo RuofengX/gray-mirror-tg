@@ -1,12 +1,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::types::Message as RawMessage;
+use grammers_client::types::{Dialog, Message as RawMessage};
 use tracing::info;
 
 use crate::{
     app::{App, Updater},
     context::Context,
-    types::{message, MessageExt, Source},
+    types::{chat, message, MessageExt, Source},
 };
 
 pub struct GrayMirror;
@@ -25,6 +25,7 @@ impl std::fmt::Display for GrayMirror {
 
 impl App for GrayMirror {
     async fn ignite(&mut self, context: crate::context::Context) -> anyhow::Result<()> {
+        fetch_all_joined_group(context.clone()).await?;
         context.add_updater(GrayMirror::new()).await?;
         Ok(())
     }
@@ -67,4 +68,18 @@ impl Updater for GrayMirror {
 
         flag
     }
+}
+
+async fn fetch_all_joined_group(context: Context) -> Result<()> {
+    let mut dialogs = context.client.iter_dialogs();
+    while let Some(Dialog { chat, .. }) = dialogs.next().await? {
+        if context.persist.find_chat(chat.username()).await?.is_some() {
+            continue;
+        }
+        context
+            .persist
+            .put_chat(chat::ActiveModel::from_chat(&chat, Source::from_manual()))
+            .await?;
+    }
+    Ok(())
 }

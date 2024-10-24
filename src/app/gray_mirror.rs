@@ -25,7 +25,7 @@ impl std::fmt::Display for GrayMirror {
 
 impl App for GrayMirror {
     async fn ignite(&mut self, context: crate::context::Context) -> anyhow::Result<()> {
-        fetch_all_joined_group(context.clone()).await?;
+        // fetch_all_joined_group(context.clone()).await?;
         context.add_updater(GrayMirror::new()).await?;
         Ok(())
     }
@@ -70,7 +70,7 @@ impl Updater for GrayMirror {
     }
 }
 
-async fn fetch_all_joined_group(context: Context) -> Result<()> {
+pub async fn fetch_all_joined_group(context: Context) -> Result<()> {
     let mut dialogs = context.client.iter_dialogs();
     while let Some(Dialog { chat, .. }) = dialogs.next().await? {
         if context.persist.find_chat(chat.username()).await?.is_some() {

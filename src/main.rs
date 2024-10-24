@@ -14,8 +14,9 @@ pub mod types;
 async fn main() -> Result<()> {
     println!("你好世界!");
 
-    let ctx = Context::new().await?.enable_update().await?;
+    let ctx = Context::new().await?;
 
+    ctx.enable_update().await?;
     ctx.add_app(app::finder::Finder::new(Engine::SOSO)).await?;
     ctx.add_app(app::addchat::AddChat::new()).await?;
     ctx.run().await?;

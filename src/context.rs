@@ -124,7 +124,7 @@ impl Context {
         );
     }
 
-    pub async fn enable_update(self) -> Result<Self> {
+    pub async fn enable_update(&self) -> Result<()> {
         let client = self.client.clone();
         let sender = self.update_sender.clone();
 
@@ -136,7 +136,7 @@ impl Context {
             }
         })
         .await;
-        Ok(self)
+        Ok(())
     }
 
     /// Run until error occurs. Return first error.

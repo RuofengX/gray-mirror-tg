@@ -4,7 +4,7 @@ use sea_orm::{
     sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait,
     DatabaseConnection, EntityTrait, QueryFilter, Schema,
 };
-use tracing::{debug, info_span};
+use tracing::{debug, info_span, instrument, Level};
 
 use crate::types::{chat, link, message, search};
 
@@ -59,11 +59,10 @@ impl Database {
         Ok(Self { db })
     }
 
+    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_message(&self, data: message::ActiveModel) -> Result<message::Model> {
         let span = info_span!("提交消息");
         let _span = span.enter();
-
-        debug!("传入 >> {:?}", data);
 
         let exist = message::Entity::find()
             .filter(message::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
@@ -78,19 +77,20 @@ impl Database {
         }
     }
 
+    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_chat(&self, data: chat::ActiveModel) -> Result<chat::Model> {
         let span = info_span!("提交群组");
         let _span = span.enter();
 
-        debug!("传入 >> {:?}", data);
-
         let exist = chat::Entity::find()
-            .filter(chat::Column::ChatId.eq(data.chat_id.clone().unwrap()))
+            .filter(chat::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
             .one(&self.db)
             .await?;
         if let Some(exist) = exist {
+            debug!("重复");
             Ok(exist)
         } else {
+            debug!("排除重复");
             let rtn = chat::Entity::insert(data)
                 .on_conflict(
                     OnConflict::column(chat::Column::ChatId)
@@ -103,11 +103,8 @@ impl Database {
         }
     }
 
+    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
-        let span = info_span!("提交链接");
-        let _span = span.enter();
-
-        debug!("传入 >> {:?}", data);
         let exist = link::Entity::find()
             .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
             .one(&self.db)
@@ -120,22 +117,16 @@ impl Database {
         }
     }
 
+    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {
-        let span = info_span!("提交搜索");
-        let _span = span.enter();
-
-        debug!("传入 >> {:?}", data);
         let rtn = data.insert(&self.db).await?;
         Ok(rtn)
     }
 
+    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn find_chat(&self, username: &str) -> Result<Option<chat::Model>> {
-        let span = info_span!("查询群组名");
-        let _span = span.enter();
-
-        debug!("传入 >> {:?}", username);
         let rtn = chat::Entity::find()
-            .filter(chat::Column::Username.eq(username))
+            .filter(chat::Column::Usernames.contains(username)) //FIXME: 此处需修改为pgsql能够识别的形式
             .one(&self.db)
             .await?;
 

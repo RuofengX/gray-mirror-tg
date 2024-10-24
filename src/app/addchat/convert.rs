@@ -7,6 +7,7 @@ use std::collections::VecDeque;
 
 use anyhow::{anyhow, bail, Result};
 use sea_orm::{DbConn, EntityTrait, Paginator, PaginatorTrait, SelectModel};
+use tracing::debug;
 use url::Url;
 
 use crate::types::{link, Source};
@@ -37,35 +38,73 @@ impl<'db> LinkIter<'db> {
 }
 
 #[derive(Debug)]
+pub enum LinkParse {
+    ChatMessage(ChatMessage),
+    Invite(Invite),
+    MaybeChannel(MaybeChannel),
+}
+impl TryFrom<link::Model> for LinkParse {
+    type Error = anyhow::Error;
+
+    fn try_from(value: link::Model) -> Result<Self> {
+        let url = Url::parse(&value.link)?;
+        let source = Source::from_link(&value);
+        let mut path = url
+            .path_segments()
+            .ok_or(anyhow!("[0]未找到路径 >> {}", value.link))?;
+        let part1 = path
+            .next()
+            .ok_or(anyhow!("[1]未找到聊天名 >> {}", value.link))?
+            .to_string();
+        if part1.starts_with("+") {
+            debug!("[1]是邀请链接 >> {}", value.link);
+            return Ok(Self::Invite(Invite {
+                invite_link: url.to_string(),
+                invite_code: part1,
+                source,
+            }));
+        };
+        if let Some(part2) = path.next() {
+            if let Ok(part2_num) = part2.parse::<i32>() {
+                debug!("[2]是消息编号 >> {}", value.link);
+                let rtn = Self::ChatMessage(ChatMessage {
+                    username: part1,
+                    msg_id: part2_num,
+                    source,
+                });
+                return Ok(rtn);
+            } else {
+                bail!("[2]不是消息编号 >> {}", value.link);
+            }
+        } else {
+            debug!("[1]可能是群组链接 >> {}", value.link);
+            let rtn = Self::MaybeChannel(MaybeChannel {
+                username: part1,
+                source,
+            });
+            return Ok(rtn);
+        };
+    }
+}
+
+#[derive(Debug)]
 pub struct ChatMessage {
     pub username: String,
     pub msg_id: i32,
     pub source: Source,
 }
-impl TryFrom<link::Model> for ChatMessage {
-    type Error = anyhow::Error;
-
-    fn try_from(value: link::Model) -> Result<Self> {
-        let url = Url::parse(&value.link)?;
-        let mut path = url.path_segments().ok_or(anyhow!("[0]未找到路径 >> {}", value.link))?;
-        let username = path.next().ok_or(anyhow!("[1]未找到聊天名 >> {}", value.link))?.to_string(); // TODO: 处理这些路径
-        if username.starts_with("+") {
-            bail!("[1]是邀请链接 >> {}", value.link)
-        }
-        let msg_id = path
-            .next()
-            .ok_or(anyhow!("[2]未找到消息号 >> {}", value.link))?
-            .parse::<i32>()
-            .map_err(|_| anyhow!("[2]不是消息号码 >> {}", value.link))?;
-        let rtn = ChatMessage {
-            username,
-            msg_id,
-            source: Source::from_link(&value),
-        };
-        Ok(rtn)
-    }
+#[derive(Debug)]
+pub struct Invite {
+    pub invite_link: String,
+    pub invite_code: String,
+    pub source: Source,
 }
 
+#[derive(Debug)]
+pub struct MaybeChannel {
+    pub username: String,
+    pub source: Source,
+}
 pub struct ChatMessageExt {
     pub chat: grammers_client::types::Chat,
     pub msg_id: i32,

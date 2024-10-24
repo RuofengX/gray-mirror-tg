@@ -19,7 +19,8 @@ use crate::{
     persist::Database,
 };
 
-pub const RESOLVE_USER_NAME_FREQ: Duration = std::time::Duration::from_secs(5);
+pub const JOIN_CHAT_FREQ: Duration = std::time::Duration::from_secs(60);
+pub const RESOLVE_USER_NAME_FREQ: Duration = std::time::Duration::from_secs(10);
 pub const UNPACK_CHAT_FREQ: Duration = std::time::Duration::from_millis(500);
 pub const FIND_MSG_FREQ: Duration = std::time::Duration::from_millis(500);
 pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);

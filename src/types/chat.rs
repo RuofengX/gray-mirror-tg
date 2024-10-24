@@ -32,7 +32,7 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub chat_id: i64,
     pub ty: ChatType,
-    pub username: String,
+    pub usernames: Vec<String>,
     pub name: String,
     pub packed: String,
     pub source: SourceType,
@@ -49,7 +49,7 @@ impl ActiveModel {
         Self {
             chat_id: Set(chat.id()),
             ty: Set(chat.into()),
-            username: Set(chat.username().unwrap_or_default().to_string()),
+            usernames: Set(chat.usernames().into_iter().map(|s| s.to_string()).collect()),
             name: Set(chat.name().to_string()),
             packed: Set(chat.pack().to_hex()),
             source: Set(source.ty),

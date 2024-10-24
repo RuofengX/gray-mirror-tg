@@ -46,10 +46,17 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
     pub fn from_chat(chat: &grammers_client::types::Chat, source: &Source) -> Self {
+        let usernames = chat
+            .username()
+            .map(|username| vec![username])
+            .unwrap_or_else(|| chat.usernames())
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
         Self {
             chat_id: Set(chat.id()),
             ty: Set(chat.into()),
-            usernames: Set(chat.usernames().into_iter().map(|s| s.to_string()).collect()),
+            usernames: Set(usernames),
             name: Set(chat.name().to_string()),
             packed: Set(chat.pack().to_hex()),
             source: Set(source.ty),

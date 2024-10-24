@@ -1,9 +1,6 @@
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use sea_orm::{
-    sea_query::OnConflict, ActiveModelTrait, ColumnTrait, ConnectOptions, ConnectionTrait,
-    DatabaseConnection, EntityTrait, QueryFilter, Schema,
-};
+use sea_orm::{prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, Schema, Statement};
 use tracing::{debug, info_span, instrument, Level};
 
 use crate::types::{chat, link, message, search};
@@ -125,8 +122,13 @@ impl Database {
 
     #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn find_chat(&self, username: &str) -> Result<Option<chat::Model>> {
+        let raw_sql = Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            r#"SELECT * FROM "chat" WHERE $1 = ANY("usernames")"#,
+            [username.into()],
+        );
         let rtn = chat::Entity::find()
-            .filter(chat::Column::Usernames.contains(username)) //FIXME: 此处需修改为pgsql能够识别的形式
+            .from_raw_sql(raw_sql)
             .one(&self.db)
             .await?;
 

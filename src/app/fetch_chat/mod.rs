@@ -350,7 +350,10 @@ pub async fn fetch_chat_history(
                             .put_message(message::ActiveModel::from_inner_msg(&msg, source))
                             .await?;
                     }
-                    info!("流提前结束");
+
+                    if count <= limit {
+                        info!("流提前结束");
+                    }
 
                     Ok(())
                 },

@@ -2,7 +2,7 @@ use std::{fmt::Display, sync::Arc};
 
 use anyhow::Result;
 use tokio::{sync::Mutex, time::Instant};
-use tracing::{info, info_span, warn};
+use tracing::{error, info, info_span, warn};
 
 use crate::context::{Context, BOT_RESEND_FREQ, BOT_RESP_TIMEOUT};
 
@@ -44,9 +44,12 @@ impl Watchdog {
             if tokio::time::Instant::now() - *last > BOT_RESP_TIMEOUT {
                 warn!("超时 > {}", self);
                 info!("发送消息");
-                ctx.client
+                let _ = ctx.client
                     .send_message(self.engine.chat, self.keyword)
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        error!("发送消息失败 >> {}", e);
+                    });
                 *last = tokio::time::Instant::now();
             }
         }

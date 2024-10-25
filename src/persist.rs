@@ -4,7 +4,7 @@ use sea_orm::{
     prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, Schema, Statement,
     TransactionTrait,
 };
-use tracing::{debug, info, info_span};
+use tracing::{debug, info_span};
 
 use crate::types::{chat, link, message, search};
 
@@ -63,7 +63,6 @@ impl Database {
         let span = info_span!("提交消息");
         let _span = span.enter();
 
-        info!("");
         let chat_id = data.chat_id.clone().unwrap();
         let msg_id = data.msg_id.clone().unwrap();
 
@@ -79,7 +78,6 @@ impl Database {
             .expect("事务进行中");
 
         trans.commit().await?;
-        info!("OK");
         Ok(rtn)
     }
 
@@ -104,7 +102,6 @@ impl Database {
                 )
                 .exec_with_returning(&self.db)
                 .await?;
-            info!("OK");
             Ok(rtn)
         }
     }
@@ -113,7 +110,6 @@ impl Database {
         let span = info_span!("提交链接");
         let _span = span.enter();
 
-        info!("");
         let exist = link::Entity::find()
             .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
             .one(&self.db)
@@ -122,7 +118,6 @@ impl Database {
             Ok(exist)
         } else {
             let rtn = data.insert(&self.db).await?;
-            info!("OK");
             Ok(rtn)
         }
     }
@@ -132,7 +127,6 @@ impl Database {
         let _span = span.enter();
 
         let rtn = data.insert(&self.db).await?;
-        info!("OK");
         Ok(rtn)
     }
 

@@ -322,8 +322,10 @@ pub async fn fetch_chat_history(context: Context, chat: PackedChat, limit: usize
             .as_secs() as i32,
     );
 
-    info!("开始");
+    let mut count = 0;
     while let Some(Some(msg)) = history.next().await.log_error() {
+        count += 1;
+        info!("获取消息 > {}/{} >> {:?}", count, limit, source);
         context
             .persist
             .put_message(message::ActiveModel::from_inner_msg(&msg, source))

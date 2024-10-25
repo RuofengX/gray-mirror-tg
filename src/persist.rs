@@ -4,7 +4,7 @@ use sea_orm::{
     prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, Schema, Statement,
     TransactionTrait,
 };
-use tracing::{debug, info_span, instrument, Level};
+use tracing::{debug, info, info_span};
 
 use crate::types::{chat, link, message, search};
 
@@ -59,11 +59,11 @@ impl Database {
         Ok(Self { db })
     }
 
-    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_message(&self, data: message::ActiveModel) -> Result<message::Model> {
         let span = info_span!("提交消息");
         let _span = span.enter();
 
+        info!("");
         let chat_id = data.chat_id.clone().unwrap();
         let msg_id = data.msg_id.clone().unwrap();
 
@@ -82,11 +82,11 @@ impl Database {
         Ok(rtn)
     }
 
-    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_chat(&self, data: chat::ActiveModel) -> Result<chat::Model> {
         let span = info_span!("提交群组");
         let _span = span.enter();
 
+        info!("");
         let exist = chat::Entity::find()
             .filter(chat::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
             .one(&self.db)
@@ -108,8 +108,11 @@ impl Database {
         }
     }
 
-    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
+        let span = info_span!("提交链接");
+        let _span = span.enter();
+
+        info!("");
         let exist = link::Entity::find()
             .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
             .one(&self.db)
@@ -122,16 +125,18 @@ impl Database {
         }
     }
 
-    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {
+        let span = info_span!("提交搜索");
+        let _span = span.enter();
+
+        info!("");
         let rtn = data.insert(&self.db).await?;
         Ok(rtn)
     }
 
-    #[instrument(skip(self), level = Level::DEBUG)]
     pub async fn find_chat(&self, username: Option<&str>) -> Result<Option<chat::Model>> {
-        if username.is_none(){
-            return Ok(None)
+        if username.is_none() {
+            return Ok(None);
         }
         let username = username.unwrap();
 

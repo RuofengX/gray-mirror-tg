@@ -1,5 +1,4 @@
 use anyhow::Result;
-use app::finder::engine::Engine;
 use context::Context;
 use tokio;
 use tracing::{info, warn};
@@ -21,7 +20,7 @@ async fn main() -> Result<()> {
     ctx.fetch_all_chat_history(100000).await?;
 
     ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
-    ctx.add_app(app::finder::Finder::new(Engine::SOSO)).await?;
+    ctx.add_app(app::finder::Search::default()).await?;
     ctx.add_app(app::addchat::AddChat::new()).await?;
     ctx.run().await?;
 

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
+use grammers_client::grammers_tl_types as tl;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::{sync::mpsc::Sender, time::Interval};
 use tracing::{debug, info, info_span, instrument, warn};
@@ -237,15 +238,34 @@ impl AddChat {
         _chat_send: &Sender<ChatMessageExt>,
         join_limit: &mut Interval,
     ) -> Result<()> {
-        // TODO:  更改上游表现后添加至chat_send中
+        // 限制加入聊天频率
+        join_limit.tick().await;
+        let update_chat = match context
+            .client
+            .accept_invite_link(&invite.invite_link)
+            .await?
+        {
+            tl::enums::Updates::Combined(updates) => Some(updates.chats),
+            tl::enums::Updates::Updates(updates) => Some(updates.chats),
+            _ => None,
+        };
+        let chat = match update_chat {
+            Some(chats) if !chats.is_empty() => {
+                Some(grammers_client::types::Chat::from_raw(chats[0].clone()))
+            }
+            Some(chats) if chats.is_empty() => None,
+            None => None,
+            Some(_) => None,
+        };
 
-        // let _chat = context
-        //     .client
-        //     .accept_invite_link(&invite.invite_link)
-        //     .await?;
-
-        // // 限制加入聊天频率
-        // join_limit.tick().await;
+        if let Some(chat) = chat {
+            context
+                .persist
+                .put_chat(chat::ActiveModel::from_chat(&chat, invite.source))
+                .await?;
+        } else {
+            bail!("返回值中未找到chat")
+        }
 
         Ok(())
     }

@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
 
     ctx.enable_update().await?;
     // ctx.fetch_all_chat_history(100000).await?;
-    ctx.fetch_all_chat_history(1000).await?;
+    ctx.fetch_all_chat_history(100).await?; // 防止错过消息
 
     ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
     ctx.add_app(app::finder::Search::default()).await?;

@@ -7,7 +7,7 @@ use grammers_client::types::PackedChat;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
-use tracing::{debug, debug_span, info, info_span, instrument, warn};
+use tracing::{debug, debug_span, info, info_span, instrument, warn, Instrument};
 
 use crate::types::Source;
 use crate::{
@@ -302,30 +302,40 @@ pub async fn fetch_chat_history(
         let source = Source::from_chat(chat.id);
         let history_span = info_span!(
             "获取群组历史",
-            chat = format!("{:?}", source),
+            chat_id = format!("{}", source.id),
             limit = limit,
         );
-        let _span = history_span.enter();
 
-        let mut history = context.client.iter_messages(chat).limit(limit).max_date(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("时间不够倒退")
-                .as_secs() as i32,
-        );
+        let ctx = context.clone();
 
-        let mut count = 0;
-        while let Some(Some(msg)) = history.next().await.unwrap_or_warn() {
-            context.interval.find_msg.tick().await;
-            count += 1;
+        context
+            .add_background_task(
+                "获取群组历史",
+                async move {
+                    let mut history = ctx.client.iter_messages(chat).limit(limit).max_date(
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("时间不够倒退")
+                            .as_secs() as i32,
+                    );
 
-            info!("获取消息 > {}/{} >> {:?}", count, limit, source);
-            context
-                .persist
-                .put_message(message::ActiveModel::from_inner_msg(&msg, source))
-                .await?;
-        }
-        info!("流提前结束");
+                    let mut count = 0;
+                    while let Some(Some(msg)) = history.next().await.unwrap_or_warn() {
+                        ctx.interval.find_msg.tick().await;
+                        count += 1;
+
+                        info!("获取消息 > {}/{}", count, limit);
+                        ctx.persist
+                            .put_message(message::ActiveModel::from_inner_msg(&msg, source))
+                            .await?;
+                    }
+                    info!("流提前结束");
+
+                    Ok(())
+                }
+                .instrument(history_span),
+            )
+            .await;
     }
     Ok(())
 }

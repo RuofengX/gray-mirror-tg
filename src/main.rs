@@ -2,6 +2,7 @@ use anyhow::Result;
 use app::finder::engine::Engine;
 use context::Context;
 use tokio;
+use tracing::{info, warn};
 
 pub mod login;
 
@@ -23,4 +24,26 @@ async fn main() -> Result<()> {
     ctx.run().await?;
 
     Ok(())
+}
+
+pub trait PrintError<T, E> {
+    fn log_error(self) -> Option<T>;
+    fn log_result(self) -> ();
+}
+impl<T: std::fmt::Debug, E: std::fmt::Display> PrintError<T, E> for Result<T, E> {
+    fn log_error(self) -> Option<T> {
+        match self {
+            Ok(t) => Some(t),
+            Err(e) => {
+                warn!("{}", e);
+                None
+            }
+        }
+    }
+    fn log_result(self) -> () {
+        match self {
+            Ok(t) => info!("{:?}", t),
+            Err(e) => warn!("{}", e),
+        }
+    }
 }

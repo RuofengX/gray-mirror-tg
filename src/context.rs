@@ -10,13 +10,14 @@ use tokio::{
     },
     task::JoinSet,
 };
-use tracing::{info, info_span, level_filters::STATIC_MAX_LEVEL, trace, Instrument};
+use tracing::{info, info_span, level_filters::STATIC_MAX_LEVEL, trace, warn, Instrument};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
     app::{App, UpdateRuntime, Updater},
     persist::Database,
+    PrintError,
 };
 
 pub const JOIN_CHAT_FREQ: Duration = std::time::Duration::from_secs(60);
@@ -29,7 +30,7 @@ pub const BOT_RESEND_FREQ: Duration = std::time::Duration::from_secs(30);
 pub struct ContextInner {
     pub client: Client,
     pub persist: Database,
-    background_tasks: Mutex<JoinSet<Result<()>>>,
+    background_tasks: Mutex<JoinSet<()>>,
     update_sender: Sender<Update>,
 }
 
@@ -64,7 +65,6 @@ impl Context {
 
             background_tasks.spawn(async move {
                 task.await;
-                Ok(()) // map () -> Result(())
             });
             logger.with(layer).init();
         } else {
@@ -116,9 +116,8 @@ impl Context {
         self.background_tasks.lock().await.spawn(
             async move {
                 info!("启动");
-                let rtn = task.await;
-                info!("退出 >> {:?}", rtn);
-                rtn
+                task.await.log_result();
+                info!("退出");
             }
             .instrument(bg_span),
         );
@@ -130,9 +129,14 @@ impl Context {
 
         self.add_background_task("更新监听", async move {
             loop {
-                let update = client.next_update().await?;
+                let update = client.next_update().await.log_error();
+
+                if update.is_none() {
+                    continue;
+                }
+
                 trace!("发送");
-                sender.send(update)?;
+                sender.send(update.expect("已处理"))?;
             }
         })
         .await;
@@ -145,8 +149,9 @@ impl Context {
         let _span = main_span.enter();
 
         while let Some(result) = self.background_tasks.lock().await.join_next().await {
-            result??;
+            result.log_error();
         }
+        warn!("全部任务结束");
         Ok(())
     }
 }

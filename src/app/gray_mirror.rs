@@ -1,12 +1,15 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::types::{Dialog, Message as RawMessage};
-use tracing::info;
+use grammers_client::types::{Chat, Dialog, Message as RawMessage};
+use tracing::{info, info_span};
 
 use crate::{
     app::{App, Updater},
     context::Context,
     types::{chat, message, MessageExt, Source},
+    PrintError,
 };
 
 pub struct GrayMirror;
@@ -79,6 +82,28 @@ pub async fn fetch_all_joined_group(context: Context) -> Result<()> {
         context
             .persist
             .put_chat(chat::ActiveModel::from_chat(&chat, Source::from_manual()))
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn fetch_chat_history(context: Context, chat: Chat, limit: usize) -> Result<()> {
+    let history_span = info_span!("获取群组历史");
+    let _span = history_span.enter();
+    let source = Source::from_chat(chat.id());
+    info!("{:?}", source);
+
+    let mut history = context.client.iter_messages(chat).limit(limit).max_date(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("时间不够倒退")
+            .as_secs() as i32,
+    );
+
+    while let Some(Some(msg)) = history.next().await.log_error() {
+        context
+            .persist
+            .put_message(message::ActiveModel::from_inner_msg(&msg, source))
             .await?;
     }
     Ok(())

@@ -12,7 +12,7 @@ use tracing::info_span;
 use crate::{context::Context, types::MessageExt, PrintError};
 
 /// 自动添加群组、频道
-pub mod addchat;
+pub mod fetch_chat;
 /// 利用soso等机器人挖掘关联群组
 pub mod finder;
 /// 简单的范用应用

@@ -90,7 +90,7 @@ impl Context {
     }
 
     pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()> {
-        let span = info_span!("更新处理器", name = format!("{}", updater));
+        let span = info_span!("更新处理器", updater = format!("{}", updater));
 
         let recv = self.update_sender.subscribe();
         let runtime = UpdateRuntime::new(recv, self.clone(), Box::new(updater));
@@ -140,7 +140,7 @@ impl Context {
         let (send, recv) = tokio::sync::mpsc::channel(64);
         let ctx = self.clone();
         self.add_background_task(info_span!("全库聊天历史"), async move {
-            app::addchat::fetch_chat_history(recv, ctx, limit).await?;
+            app::fetch_chat::fetch_chat_history(recv, ctx, limit).await?;
             Ok(())
         })
         .await;

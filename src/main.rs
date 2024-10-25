@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
 
     ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
     ctx.add_app(app::finder::Search::default()).await?;
-    ctx.add_app(app::addchat::AddChat::new()).await?;
+    ctx.add_app(app::fetch_chat::AddChat::new()).await?;
     ctx.run().await?;
 
     Ok(())

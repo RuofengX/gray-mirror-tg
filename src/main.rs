@@ -18,6 +18,8 @@ async fn main() -> Result<()> {
     let ctx = Context::new().await?;
 
     ctx.enable_update().await?;
+    ctx.fetch_all_chat_history(100000).await?;
+
     ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
     ctx.add_app(app::finder::Finder::new(Engine::SOSO)).await?;
     ctx.add_app(app::addchat::AddChat::new()).await?;
@@ -27,11 +29,11 @@ async fn main() -> Result<()> {
 }
 
 pub trait PrintError<T, E> {
-    fn log_error(self) -> Option<T>;
-    fn log_result(self) -> ();
+    fn unwrap_or_warn(self) -> Option<T>;
+    fn into_log(self) -> ();
 }
 impl<T: std::fmt::Debug, E: std::fmt::Display> PrintError<T, E> for Result<T, E> {
-    fn log_error(self) -> Option<T> {
+    fn unwrap_or_warn(self) -> Option<T> {
         match self {
             Ok(t) => Some(t),
             Err(e) => {
@@ -40,7 +42,7 @@ impl<T: std::fmt::Debug, E: std::fmt::Display> PrintError<T, E> for Result<T, E>
             }
         }
     }
-    fn log_result(self) -> () {
+    fn into_log(self) -> () {
         match self {
             Ok(t) => info!("{:?}", t),
             Err(e) => warn!("{}", e),

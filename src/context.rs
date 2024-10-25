@@ -2,7 +2,8 @@ use std::{future::Future, ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use grammers_client::{Client, Update};
+use grammers_client::{types::PackedChat, Client, Update};
+use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::{
     sync::{
         broadcast::{self, Sender},
@@ -15,8 +16,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
-    app::{App, UpdateRuntime, Updater},
+    app::{self, App, UpdateRuntime, Updater},
     persist::Database,
+    types::chat,
     PrintError,
 };
 
@@ -118,7 +120,7 @@ impl Context {
         self.background_tasks.lock().await.spawn(
             async move {
                 info!("启动");
-                task.await.log_result();
+                task.await.into_log();
                 info!("退出");
             }
             .instrument(bg_span),
@@ -131,7 +133,7 @@ impl Context {
 
         self.add_background_task("更新监听", async move {
             loop {
-                let update = client.next_update().await.log_error();
+                let update = client.next_update().await.unwrap_or_warn();
 
                 if update.is_none() {
                     continue;
@@ -145,13 +147,33 @@ impl Context {
         Ok(())
     }
 
+    pub async fn fetch_all_chat_history(&self, limit: usize) -> Result<()> {
+        let (send, recv) = tokio::sync::mpsc::channel(64);
+        let ctx = self.clone();
+        self.add_background_task("全库聊天历史", async move {
+            app::addchat::fetch_chat_history(recv, ctx, limit).await?;
+            Ok(())
+        })
+        .await;
+
+        let mut iter = chat::Entity::find()
+            .into_partial_model::<chat::PackedChatOnly>()
+            .paginate(&self.persist.db, 8);
+        while let Some(chats) = iter.fetch_and_next().await? {
+            for chat in chats {
+                send.send(PackedChat::from_hex(&chat.packed)?).await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Run until error occurs. Return first error.
     pub async fn run(self) -> Result<()> {
         let main_span = info_span!("主进程");
         let _span = main_span.enter();
 
         while let Some(result) = self.background_tasks.lock().await.join_next().await {
-            result.log_error();
+            result.unwrap_or_warn();
         }
         warn!("全部任务结束");
         Ok(())

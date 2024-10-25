@@ -47,7 +47,7 @@ impl Watchdog {
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)
                     .await
-                    .log_error();
+                    .unwrap_or_warn();
                 *last = tokio::time::Instant::now();
             }
         }

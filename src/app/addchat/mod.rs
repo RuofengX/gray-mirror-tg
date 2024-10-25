@@ -1,14 +1,14 @@
 use std::fmt::Display;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Result};
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::PackedChat;
 use sea_orm::{EntityTrait, PaginatorTrait};
+use tokio::sync::mpsc::Receiver;
 use tokio::{sync::mpsc::Sender, time::Interval};
 use tracing::{debug, debug_span, info, info_span, instrument, warn};
 
-use crate::context::CHAT_HISTORY_LIMIT;
 use crate::types::Source;
 use crate::{
     context::{Context, FIND_MSG_FREQ, JOIN_CHAT_FREQ, RESOLVE_USER_NAME_FREQ, UNPACK_CHAT_FREQ},
@@ -54,6 +54,14 @@ impl AddChat {
         let mut unpack_limit = tokio::time::interval(UNPACK_CHAT_FREQ);
         let mut resolve_limit = tokio::time::interval(RESOLVE_USER_NAME_FREQ);
         let mut join_limit = tokio::time::interval(JOIN_CHAT_FREQ);
+        let (mut history_send, history_recv) = tokio::sync::mpsc::channel(32);
+
+        context
+            .add_background_task(
+                "历史镜像",
+                fetch_chat_history(history_recv, context.clone(), 100000),
+            )
+            .await;
 
         loop {
             // 从数据库获取一批链接
@@ -84,34 +92,36 @@ impl AddChat {
                                 chat_msg,
                                 context.clone(),
                                 &chat_send,
+                                &mut history_send,
                                 &mut unpack_limit,
                                 &mut resolve_limit,
                                 &mut join_limit,
                             )
                             .await
-                            .log_error();
+                            .unwrap_or_warn();
                         }
                         LinkParse::Invite(invite) => {
                             Self::parse_invite(
                                 invite,
                                 context.clone(),
-                                &chat_send,
+                                &mut history_send,
                                 &mut join_limit,
                             )
                             .await
-                            .log_error();
+                            .unwrap_or_warn();
                         }
                         LinkParse::MaybeChannel(channel) => {
                             Self::parse_channel(
                                 channel,
                                 context.clone(),
+                                &mut history_send,
                                 &mut resolve_limit,
                                 &mut join_limit,
                             )
                             .await
-                            .log_error();
+                            .unwrap_or_warn();
                         }
-                    }
+                    };
                 }
             }
         }
@@ -148,11 +158,6 @@ impl AddChat {
             } else {
                 info!("未找到消息 >> {}@{}", msg_id, chat.id());
             };
-
-            // 提取chat历史消息
-            fetch_chat_history(context.clone(), chat.pack(), CHAT_HISTORY_LIMIT)
-                .await
-                .log_error();
         }
         Ok(())
     }
@@ -160,7 +165,8 @@ impl AddChat {
     async fn parse_chat_msg(
         chat_msg: ChatMessage,
         context: Context,
-        chat_send: &Sender<ChatMessageExt>,
+        msg_request: &Sender<ChatMessageExt>,
+        history_request: &Sender<PackedChat>,
         unpack_limit: &mut Interval,
         resolve_limit: &mut Interval,
         join_limit: &mut Interval,
@@ -203,6 +209,10 @@ impl AddChat {
             }
             let chat = chat.expect("已检查");
             // 成功打开chat
+
+            // 请求获取历史
+            history_request.send(chat.pack()).await?;
+
             // 存入数据库，返回chat::Model
             context
                 .persist
@@ -222,18 +232,17 @@ impl AddChat {
         }
 
         // 存入channel，让子进程完成消息提取
-        chat_send
+        msg_request
             .send(ChatMessageExt::new(chat, chat_msg.msg_id, chat_msg.source))
             .await?;
 
         Ok(())
     }
 
-    #[allow(unused_variables)]
     async fn parse_invite(
         invite: Invite,
         context: Context,
-        chat_send: &Sender<ChatMessageExt>,
+        history_request: &Sender<PackedChat>,
         join_limit: &mut Interval,
     ) -> Result<()> {
         // 限制加入聊天频率
@@ -257,6 +266,7 @@ impl AddChat {
         };
 
         if let Some(chat) = chat {
+            history_request.send(chat.pack()).await?;
             context
                 .persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, invite.source))
@@ -272,6 +282,7 @@ impl AddChat {
     async fn parse_channel(
         may_channel: MaybeChannel,
         context: Context,
+        history_request: &mut Sender<PackedChat>,
         resolve_limit: &mut Interval,
         join_limit: &mut Interval,
     ) -> Result<()> {
@@ -294,42 +305,59 @@ impl AddChat {
         {
             // 限制加入聊天频率
             join_limit.tick().await;
+            context.client.join_chat(chat.pack()).await?;
+
+            history_request.send(chat.pack()).await?;
 
             context
                 .persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, may_channel.source))
                 .await?;
-            context.client.join_chat(chat).await?;
         }
 
         Ok(())
     }
 }
 
-pub async fn fetch_chat_history(context: Context, chat: PackedChat, limit: usize) -> Result<()> {
-    let source = Source::from_chat(chat.id);
-    let history_span = info_span!(
-        "获取群组历史",
-        chat = format!("{:?}", source),
-        limit = limit
-    );
-    let _span = history_span.enter();
+pub async fn fetch_chat_history(
+    mut recv: Receiver<PackedChat>,
+    context: Context,
+    limit: usize,
+) -> Result<()> {
+    let mut msg_fetch_freq = tokio::time::interval(Duration::from_millis(20));
 
-    let mut history = context.client.iter_messages(chat).limit(limit).max_date(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("时间不够倒退")
-            .as_secs() as i32,
-    );
+    while let Some(chat) = recv.recv().await {
+        let source = Source::from_chat(chat.id);
+        let history_span = info_span!(
+            "获取群组历史",
+            chat = format!("{:?}", source),
+            limit = limit,
+        );
+        let _span = history_span.enter();
 
-    let mut count = 0;
-    while let Some(Some(msg)) = history.next().await.log_error() {
-        count += 1;
-        info!("获取消息 > {}/{} >> {:?}", count, limit, source);
-        context
-            .persist
-            .put_message(message::ActiveModel::from_inner_msg(&msg, source))
-            .await?;
+        let mut history = context
+            .client
+            .iter_messages(chat)
+            .limit(limit)
+            .max_date(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("时间不够倒退")
+                    .as_secs() as i32,
+            );
+
+        let mut count = 0;
+        while let Some(Some(msg)) = history.next().await.unwrap_or_warn() {
+            msg_fetch_freq.tick().await;
+            count += 1;
+
+            info!("获取消息 > {}/{} >> {:?}", count, limit, source);
+            context
+                .persist
+                .put_message(message::ActiveModel::from_inner_msg(&msg, source))
+                .await?;
+        }
+        info!("流提前结束");
     }
     Ok(())
 }

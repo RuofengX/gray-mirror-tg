@@ -1,6 +1,6 @@
 use anyhow::Result;
 use grammers_client::types::PackedChat;
-use sea_orm::{entity::prelude::*, Set};
+use sea_orm::{entity::prelude::*, FromQueryResult, Set};
 use serde::{Deserialize, Serialize};
 
 use super::{Source, SourceType};
@@ -70,4 +70,10 @@ impl Model {
     pub fn to_packed(&self) -> Result<PackedChat> {
         Ok(PackedChat::from_hex(&self.packed)?)
     }
+}
+
+#[derive(DerivePartialModel, FromQueryResult)]
+#[sea_orm(entity = "Entity")]
+pub struct PackedChatOnly{
+    pub packed: String,
 }

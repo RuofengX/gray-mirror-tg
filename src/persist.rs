@@ -79,6 +79,7 @@ impl Database {
             .expect("事务进行中");
 
         trans.commit().await?;
+        info!("OK");
         Ok(rtn)
     }
 
@@ -86,7 +87,6 @@ impl Database {
         let span = info_span!("提交群组");
         let _span = span.enter();
 
-        info!("");
         let exist = chat::Entity::find()
             .filter(chat::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
             .one(&self.db)
@@ -104,6 +104,7 @@ impl Database {
                 )
                 .exec_with_returning(&self.db)
                 .await?;
+            info!("OK");
             Ok(rtn)
         }
     }
@@ -121,6 +122,7 @@ impl Database {
             Ok(exist)
         } else {
             let rtn = data.insert(&self.db).await?;
+            info!("OK");
             Ok(rtn)
         }
     }
@@ -129,8 +131,8 @@ impl Database {
         let span = info_span!("提交搜索");
         let _span = span.enter();
 
-        info!("");
         let rtn = data.insert(&self.db).await?;
+        info!("OK");
         Ok(rtn)
     }
 

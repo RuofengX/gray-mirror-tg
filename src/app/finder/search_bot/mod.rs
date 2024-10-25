@@ -14,6 +14,7 @@ use engine::Engine;
 use sea_orm::Set;
 use soso::SosoScraper;
 use tokio::sync::Mutex;
+use tracing::info_span;
 
 use crate::app::{App, Updater};
 
@@ -64,7 +65,7 @@ impl App for Search {
             let watchdog = watchdog::Watchdog::new(self.engine, key, time_sync.clone());
             context
                 .add_background_task(
-                    &format!("{}", &watchdog),
+                    info_span!("看门狗"),
                     watchdog.background_task(context.clone()),
                 )
                 .await;

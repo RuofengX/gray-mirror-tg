@@ -11,7 +11,7 @@ use tokio::{
     },
     task::JoinSet,
 };
-use tracing::{info, info_span, level_filters::STATIC_MAX_LEVEL, trace, warn, Instrument};
+use tracing::{debug, info, info_span, level_filters::STATIC_MAX_LEVEL, warn, Instrument, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
@@ -81,44 +81,38 @@ impl Context {
     }
 
     pub async fn add_app(&self, mut app: impl App + 'static) -> Result<()> {
-        let name = format!("{}", app);
-        let update_span = info_span!("应用", name);
-        let _span = update_span.enter();
+        let span = info_span!("应用", name = format!("{}", app));
+        let _span = span.enter();
 
-        trace!("初始化(ignite)");
-        app.ignite(self.clone()).await?;
+        warn!("初始化(ignite)");
+        app.ignite(self.clone()).in_current_span().await?;
         Ok(())
     }
 
     pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()> {
-        let name = format!("{}", &updater);
-        let update_span = info_span!("更新器", name);
+        let span = info_span!("更新处理器", name = format!("{}", updater));
 
         let recv = self.update_sender.subscribe();
         let runtime = UpdateRuntime::new(recv, self.clone(), Box::new(updater));
 
-        self.add_background_task(
-            &format!("{}", runtime),
-            async move { runtime.run().await }.instrument(update_span),
-        )
-        .await;
+        self.add_background_task(span, runtime.run())
+            .in_current_span()
+            .await;
         Ok(())
     }
 
     pub async fn add_background_task(
         &self,
-        name: &str,
+        span: Span,
         task: impl Future<Output = Result<()>> + Send + 'static,
     ) -> () {
-        let bg_span = info_span!("后台任务", name = name);
-
         self.background_tasks.lock().await.spawn(
             async move {
                 info!("启动");
                 task.await.into_log();
                 info!("退出");
             }
-            .instrument(bg_span),
+            .instrument(span),
         );
     }
 
@@ -126,7 +120,7 @@ impl Context {
         let client = self.client.clone();
         let sender = self.update_sender.clone();
 
-        self.add_background_task("更新监听", async move {
+        self.add_background_task(info_span!("监听更新"), async move {
             loop {
                 let update = client.next_update().await.unwrap_or_warn();
 
@@ -134,7 +128,7 @@ impl Context {
                     continue;
                 }
 
-                trace!("发送");
+                debug!("发送");
                 sender.send(update.expect("已处理"))?;
             }
         })
@@ -145,7 +139,7 @@ impl Context {
     pub async fn fetch_all_chat_history(&self, limit: usize) -> Result<()> {
         let (send, recv) = tokio::sync::mpsc::channel(64);
         let ctx = self.clone();
-        self.add_background_task("全库聊天历史", async move {
+        self.add_background_task(info_span!("全库聊天历史"), async move {
             app::addchat::fetch_chat_history(recv, ctx, limit).await?;
             Ok(())
         })
@@ -164,11 +158,10 @@ impl Context {
 
     /// Run until error occurs. Return first error.
     pub async fn run(self) -> Result<()> {
-        let main_span = info_span!("主进程");
-        let _span = main_span.enter();
-
         while let Some(result) = self.background_tasks.lock().await.join_next().await {
-            result.unwrap_or_warn();
+            let span = info_span!("守护进程");
+            let _span = span.enter();
+            result.unwrap_or_log();
         }
         warn!("全部任务结束");
         Ok(())

@@ -35,7 +35,7 @@ impl App for GrayMirror {
 impl Updater for GrayMirror {
     async fn message_recv(&mut self, context: Context, msg: MessageExt) -> Result<()> {
         let source = Source::from_chat(msg.inner.chat().id());
-        info!("接收更新 >> {:?}", source);
+        info!(source_id = source.id, "接收更新");
         context
             .persist
             .put_message(message::ActiveModel::from_inner_msg(&msg.inner, source))

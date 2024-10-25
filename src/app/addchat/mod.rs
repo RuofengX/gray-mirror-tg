@@ -1,13 +1,13 @@
 use std::fmt::Display;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::PackedChat;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
-use tracing::{debug, debug_span, info, info_span, instrument, warn, Instrument};
+use tracing::{debug, debug_span, info, info_span, warn};
 
 use crate::types::Source;
 use crate::{
@@ -32,10 +32,16 @@ impl App for AddChat {
     async fn ignite(&mut self, context: Context) -> Result<()> {
         let (s, r) = tokio::sync::mpsc::channel(64);
         context
-            .add_background_task("链接消息提取", Self::fetch_message(context.clone(), r))
+            .add_background_task(
+                info_span!("链接消息提取"),
+                Self::fetch_message(context.clone(), r),
+            )
             .await;
         context
-            .add_background_task("群组探针", Self::fetch_group(context.clone(), s))
+            .add_background_task(
+                info_span!("群组探针"),
+                Self::fetch_group(context.clone(), s),
+            )
             .await;
         Ok(())
     }
@@ -55,7 +61,7 @@ impl AddChat {
 
         context
             .add_background_task(
-                "历史镜像",
+                info_span!("历史镜像"),
                 fetch_chat_history(history_recv, context.clone(), 100000),
             )
             .await;
@@ -123,20 +129,28 @@ impl AddChat {
             debug!("接收消息链接 > id >> {}", chat_msg.msg_id);
             // 解包数据
             let chat = &chat_msg.chat;
+            let chat_id = chat_msg.chat.id();
             let msg_id = chat_msg.msg_id;
             let source = chat_msg.source;
 
             // 从chat提取消息
             context.interval.find_msg.tick().await;
-            if let Some(msg) = &context.client.get_messages_by_id(chat, &[msg_id]).await?[0] {
+            let msg = context
+                .client
+                .get_messages_by_id(chat, &[msg_id])
+                .await?
+                .pop()
+                .unwrap();
+            let span = info_span!("查找消息", chat_id, msg_id);
+            let _span = span.enter();
+
+            if let Some(msg) = msg {
                 // 存储msg
-                info!("找到消息 >> {}@{}", msg_id, chat.id());
-                context
-                    .persist
-                    .put_message(message::ActiveModel::from_inner_msg(&msg, source))
-                    .await?;
+                info!("找到消息");
+                let msg = message::ActiveModel::from_inner_msg(&msg, source);
+                context.persist.put_message(msg).await?;
             } else {
-                info!("未找到消息 >> {}@{}", msg_id, chat.id());
+                info!("未找到消息");
             };
         }
         Ok(())
@@ -148,44 +162,47 @@ impl AddChat {
         msg_request: &Sender<ChatMessageExt>,
         history_request: &Sender<PackedChat>,
     ) -> Result<()> {
-        let chat_name = &chat_msg.username; // 群组名
+        let chat_name = chat_msg.username.as_str(); // 群组名
 
-        // 获取chat::Model
         // 判断是否已采集，避免频繁调用resolve_username
-        let chat = if let Some(chat) = context.persist.find_chat(Some(chat_name)).await? {
-            // 已采集
-            info!("已采集群组名 >> {}", chat_name);
+        // 获取chat::Model
+        let chat = context.persist.find_chat(Some(chat_name)).await?;
 
-            // 从Model读取PackedChat
-            let packed_chat = chat.to_packed()?;
+        let span = info_span!("处理聊天消息", chat_name);
+        let _span = span.enter();
+
+        let chat = if let Some(chat) = chat {
+            // 已采集
+            info!("已采集过群组名");
+
             // 限制unpack频率
             context.interval.unpack_chat.tick().await;
+            // 从Model读取PackedChat
+            let packed_chat = chat.to_packed()?;
+
             // 用Client解包PackedChat，并返回
             let chat = context.client.unpack_chat(packed_chat).await?;
             chat
         } else {
             // 未采集
-            warn!("新采集群组名 >> {}", chat_name);
+            warn!("新采集群组名");
             // 限制resolve频率
             context.interval.resolve_username.tick().await;
             let chat = context.client.resolve_username(chat_name).await;
             if matches!(chat, Err(_)) {
                 // 查不到chat出错，放弃，搞下一个link
-                warn!(
-                    "查询群组名出错 > {} >> {}",
-                    chat_name,
-                    chat.expect_err("已检查")
-                );
+                warn!("查询群组名出错",);
                 return Ok(());
             }
             let chat = chat.expect("已检查");
             if matches!(chat, None) {
                 // 查不到chat，放弃，搞下一个link
-                warn!("查询未找到群组名 >> {}", chat_name);
+                warn!("查询未找到群组名");
                 return Ok(());
             }
-            let chat = chat.expect("已检查");
+
             // 成功打开chat
+            let chat = chat.expect("已检查");
 
             // 请求获取历史
             history_request.send(chat.pack()).await?;
@@ -196,18 +213,14 @@ impl AddChat {
                 .put_chat(chat::ActiveModel::from_chat(&chat, chat_msg.source))
                 .await?;
             chat
-
-            // 返回chat，之后存入channel
-        };
+        }; // 返回chat，之后存入channel
 
         // 限制加入聊天频率
         context.interval.join_chat.tick().await;
-
         // 加入聊天
         if context.client.join_chat(&chat).await?.is_some() {
-            warn!("加入聊天 >> {}", chat.name());
+            warn!("加入聊天");
         }
-
         // 存入channel，让子进程完成消息提取
         msg_request
             .send(ChatMessageExt::new(chat, chat_msg.msg_id, chat_msg.source))
@@ -221,13 +234,14 @@ impl AddChat {
         context: Context,
         history_request: &Sender<PackedChat>,
     ) -> Result<()> {
+        let link = invite.invite_link.as_str();
+        let span = info_span!("处理邀请链接", link);
+        let _span = span.enter();
+
         // 限制加入聊天频率
         context.interval.join_chat.tick().await;
-        let update_chat = match context
-            .client
-            .accept_invite_link(&invite.invite_link)
-            .await?
-        {
+        // 取回chat实例
+        let update_chat = match context.client.accept_invite_link(link).await? {
             tl::enums::Updates::Combined(updates) => Some(updates.chats),
             tl::enums::Updates::Updates(updates) => Some(updates.chats),
             _ => None,
@@ -242,31 +256,35 @@ impl AddChat {
         };
 
         if let Some(chat) = chat {
+            warn!("加入聊天");
             history_request.send(chat.pack()).await?;
             context
                 .persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, invite.source))
                 .await?;
         } else {
-            bail!("返回值中未找到chat")
+            warn!("返回值中未找到chat");
         }
 
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn parse_channel(
         may_channel: MaybeChannel,
         context: Context,
         history_request: &mut Sender<PackedChat>,
     ) -> Result<()> {
+        let chat_username = may_channel.username.as_str();
+        let span = info_span!("处理群组链接", chat_username);
+        let _span = span.enter();
         if context
             .persist
-            .find_chat(Some(&may_channel.username))
+            .find_chat(Some(chat_username))
             .await?
             .is_some()
         {
             // 已采集
+            info!("已采集过群组名");
             return Ok(());
         }
 
@@ -277,6 +295,7 @@ impl AddChat {
             .resolve_username(&may_channel.username)
             .await?
         {
+            warn!("新采集群组名");
             // 限制加入聊天频率
             context.interval.join_chat.tick().await;
             context.client.join_chat(chat.pack()).await?;
@@ -287,6 +306,8 @@ impl AddChat {
                 .persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, may_channel.source))
                 .await?;
+        } else {
+            info!("未找到群组名");
         }
 
         Ok(())
@@ -300,17 +321,11 @@ pub async fn fetch_chat_history(
 ) -> Result<()> {
     while let Some(chat) = recv.recv().await {
         let source = Source::from_chat(chat.id);
-        let history_span = info_span!(
-            "获取群组历史",
-            chat_id = format!("{}", source.id),
-            limit = limit,
-        );
-
         let ctx = context.clone();
 
         context
             .add_background_task(
-                "获取群组历史",
+                info_span!("镜像聊天记录", chat_id = chat.id, backward_limit = limit),
                 async move {
                     let mut history = ctx.client.iter_messages(chat).limit(limit).max_date(
                         SystemTime::now()
@@ -324,7 +339,7 @@ pub async fn fetch_chat_history(
                         ctx.interval.find_msg.tick().await;
                         count += 1;
 
-                        info!("获取消息 > {}/{}", count, limit);
+                        info!(count, limit, "获取消息");
                         ctx.persist
                             .put_message(message::ActiveModel::from_inner_msg(&msg, source))
                             .await?;
@@ -332,8 +347,7 @@ pub async fn fetch_chat_history(
                     info!("流提前结束");
 
                     Ok(())
-                }
-                .instrument(history_span),
+                },
             )
             .await;
     }

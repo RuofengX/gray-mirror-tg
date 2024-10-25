@@ -27,6 +27,8 @@ pub const FIND_MSG_FREQ: Duration = std::time::Duration::from_millis(500);
 pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);
 pub const BOT_RESEND_FREQ: Duration = std::time::Duration::from_secs(30);
 
+pub const CHAT_HISTORY_LIMIT: usize = 10000;
+
 pub struct ContextInner {
     pub client: Client,
     pub persist: Database,

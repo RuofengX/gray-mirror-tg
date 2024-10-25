@@ -1,14 +1,19 @@
 use std::fmt::Display;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Result};
 use grammers_client::grammers_tl_types as tl;
+use grammers_client::types::PackedChat;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::{sync::mpsc::Sender, time::Interval};
-use tracing::{debug, info, info_span, instrument, warn};
+use tracing::{debug, debug_span, info, info_span, instrument, warn};
 
+use crate::context::CHAT_HISTORY_LIMIT;
+use crate::types::Source;
 use crate::{
     context::{Context, FIND_MSG_FREQ, JOIN_CHAT_FREQ, RESOLVE_USER_NAME_FREQ, UNPACK_CHAT_FREQ},
     types::{chat, link, message},
+    PrintError,
 };
 
 use super::App;
@@ -84,11 +89,7 @@ impl AddChat {
                                 &mut join_limit,
                             )
                             .await
-                            .err()
-                            .and_then(|e| {
-                                warn!("处理消息链接时报错 >> {}", e);
-                                None::<anyhow::Error>
-                            });
+                            .log_error();
                         }
                         LinkParse::Invite(invite) => {
                             Self::parse_invite(
@@ -98,11 +99,7 @@ impl AddChat {
                                 &mut join_limit,
                             )
                             .await
-                            .err()
-                            .and_then(|e| {
-                                warn!("处理邀请链接时报错 >> {}", e);
-                                None::<anyhow::Error>
-                            });
+                            .log_error();
                         }
                         LinkParse::MaybeChannel(channel) => {
                             Self::parse_channel(
@@ -112,11 +109,7 @@ impl AddChat {
                                 &mut join_limit,
                             )
                             .await
-                            .err()
-                            .and_then(|e| {
-                                warn!("处理频道链接时报错 >> {}", e);
-                                None::<anyhow::Error>
-                            });
+                            .log_error();
                         }
                     }
                 }
@@ -129,13 +122,13 @@ impl AddChat {
         context: Context,
         mut chat_recv: tokio::sync::mpsc::Receiver<ChatMessageExt>,
     ) -> Result<()> {
-        let group_span = info_span!("获取消息");
+        let group_span = debug_span!("获取消息");
         let _span = group_span.enter();
 
         // 限制解包频率
         let mut rate_limit = tokio::time::interval(FIND_MSG_FREQ);
 
-        // 但凡channel存在
+        // 但凡chat存在
         while let Some(chat_msg) = chat_recv.recv().await {
             debug!("接收消息链接 > id >> {}", chat_msg.msg_id);
             // 解包数据
@@ -154,7 +147,12 @@ impl AddChat {
                 rate_limit.tick().await;
             } else {
                 info!("未找到消息 >> {}@{}", msg_id, chat.id());
-            }
+            };
+
+            // 提取chat历史消息
+            fetch_chat_history(context.clone(), chat.pack(), CHAT_HISTORY_LIMIT)
+                .await
+                .log_error();
         }
         Ok(())
     }
@@ -235,7 +233,7 @@ impl AddChat {
     async fn parse_invite(
         invite: Invite,
         context: Context,
-        _chat_send: &Sender<ChatMessageExt>,
+        chat_send: &Sender<ChatMessageExt>,
         join_limit: &mut Interval,
     ) -> Result<()> {
         // 限制加入聊天频率
@@ -306,4 +304,30 @@ impl AddChat {
 
         Ok(())
     }
+}
+
+pub async fn fetch_chat_history(context: Context, chat: PackedChat, limit: usize) -> Result<()> {
+    let source = Source::from_chat(chat.id);
+    let history_span = info_span!(
+        "获取群组历史",
+        chat = format!("{:?}", source),
+        limit = limit
+    );
+    let _span = history_span.enter();
+
+    let mut history = context.client.iter_messages(chat).limit(limit).max_date(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("时间不够倒退")
+            .as_secs() as i32,
+    );
+
+    info!("开始");
+    while let Some(Some(msg)) = history.next().await.log_error() {
+        context
+            .persist
+            .put_message(message::ActiveModel::from_inner_msg(&msg, source))
+            .await?;
+    }
+    Ok(())
 }

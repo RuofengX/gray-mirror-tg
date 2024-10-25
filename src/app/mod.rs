@@ -7,16 +7,16 @@ use grammers_client::{
     Client, Update,
 };
 use tokio::sync::broadcast::{self, Receiver};
-use tracing::{error, info_span, trace};
+use tracing::info_span;
 
-use crate::{context::Context, types::MessageExt};
+use crate::{context::Context, types::MessageExt, PrintError};
 
-/// 简单的范用应用
-pub mod generic;
-/// 利用soso等机器人挖掘关联群组
-pub mod finder;
 /// 自动添加群组、频道
 pub mod addchat;
+/// 利用soso等机器人挖掘关联群组
+pub mod finder;
+/// 简单的范用应用
+pub mod generic;
 /// 收集全量数据
 pub mod gray_mirror;
 
@@ -131,15 +131,7 @@ pub trait Updater: Display + Send + Sync {
                 _ => None,
             }
         };
-        if let Some(result) = result {
-            match result {
-                Ok(_) => trace!("更新器处理了消息"),
-                Err(e) => error!("更新器返回了错误 > {} >> {e}", &self as &dyn Display),
-            }
-            Some(())
-        } else {
-            None
-        }
+        result.and_then(|some| some.unwrap_or_log())
     }
 
     /// default implement will fliter all message that incoming

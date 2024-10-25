@@ -88,7 +88,10 @@ impl AddChat {
 
                 // 遍历link
                 for link_parse in msg_link_vec {
-                    debug!("处理链接 >> {:?}", link_parse);
+                    let span = info_span!("处理链接");
+                    let _span = span.enter();
+
+                    debug!("{:?}", link_parse);
                     match link_parse {
                         LinkParse::ChatMessage(chat_msg) => {
                             Self::parse_chat_msg(
@@ -126,7 +129,10 @@ impl AddChat {
 
         // 但凡chat存在
         while let Some(chat_msg) = chat_recv.recv().await {
-            debug!("接收消息链接 > id >> {}", chat_msg.msg_id);
+            let span = info_span!("处理消息链接", chat_msg.msg_id);
+            let _span = span.enter();
+
+            debug!("接受数据");
             // 解包数据
             let chat = &chat_msg.chat;
             let chat_id = chat_msg.chat.id();

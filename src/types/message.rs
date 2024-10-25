@@ -55,12 +55,14 @@ impl MessageExt {
 
                         let offset = url.offset as usize;
                         let len = url.length as usize;
+                        let fetch_span = info_span!("处理链接偏移", offset, len);
+                        let _span = fetch_span.enter();
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
                             info!("{}", desc);
                             rtn.push(link::Link { link, desc });
                         } else {
-                            warn!("提取链接时错误 >> offset: {offset}; len: {len}");
+                            warn!("提取链接时错误");
                         }
                     }
                     _ => (),

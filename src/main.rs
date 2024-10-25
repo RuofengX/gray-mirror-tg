@@ -17,7 +17,8 @@ async fn main() -> Result<()> {
     let ctx = Context::new().await?;
 
     ctx.enable_update().await?;
-    ctx.fetch_all_chat_history(100000).await?;
+    // ctx.fetch_all_chat_history(100000).await?;
+    ctx.fetch_all_chat_history(1000).await?;
 
     ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
     ctx.add_app(app::finder::Search::default()).await?;

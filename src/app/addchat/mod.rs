@@ -1,17 +1,17 @@
 use std::fmt::Display;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{bail, Result};
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::PackedChat;
 use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::sync::mpsc::Receiver;
-use tokio::{sync::mpsc::Sender, time::Interval};
+use tokio::sync::mpsc::Sender;
 use tracing::{debug, debug_span, info, info_span, instrument, warn};
 
 use crate::types::Source;
 use crate::{
-    context::{Context, FIND_MSG_FREQ, JOIN_CHAT_FREQ, RESOLVE_USER_NAME_FREQ, UNPACK_CHAT_FREQ},
+    context::Context,
     types::{chat, link, message},
     PrintError,
 };
@@ -51,9 +51,6 @@ impl AddChat {
         let _span = group_span.enter();
 
         let db = &context.persist.db;
-        let mut unpack_limit = tokio::time::interval(UNPACK_CHAT_FREQ);
-        let mut resolve_limit = tokio::time::interval(RESOLVE_USER_NAME_FREQ);
-        let mut join_limit = tokio::time::interval(JOIN_CHAT_FREQ);
         let (mut history_send, history_recv) = tokio::sync::mpsc::channel(32);
 
         context
@@ -93,33 +90,19 @@ impl AddChat {
                                 context.clone(),
                                 &chat_send,
                                 &mut history_send,
-                                &mut unpack_limit,
-                                &mut resolve_limit,
-                                &mut join_limit,
                             )
                             .await
                             .unwrap_or_warn();
                         }
                         LinkParse::Invite(invite) => {
-                            Self::parse_invite(
-                                invite,
-                                context.clone(),
-                                &mut history_send,
-                                &mut join_limit,
-                            )
-                            .await
-                            .unwrap_or_warn();
+                            Self::parse_invite(invite, context.clone(), &mut history_send)
+                                .await
+                                .unwrap_or_warn();
                         }
                         LinkParse::MaybeChannel(channel) => {
-                            Self::parse_channel(
-                                channel,
-                                context.clone(),
-                                &mut history_send,
-                                &mut resolve_limit,
-                                &mut join_limit,
-                            )
-                            .await
-                            .unwrap_or_warn();
+                            Self::parse_channel(channel, context.clone(), &mut history_send)
+                                .await
+                                .unwrap_or_warn();
                         }
                     };
                 }
@@ -135,9 +118,6 @@ impl AddChat {
         let group_span = debug_span!("获取消息");
         let _span = group_span.enter();
 
-        // 限制解包频率
-        let mut rate_limit = tokio::time::interval(FIND_MSG_FREQ);
-
         // 但凡chat存在
         while let Some(chat_msg) = chat_recv.recv().await {
             debug!("接收消息链接 > id >> {}", chat_msg.msg_id);
@@ -147,6 +127,7 @@ impl AddChat {
             let source = chat_msg.source;
 
             // 从chat提取消息
+            context.interval.find_msg.tick().await;
             if let Some(msg) = &context.client.get_messages_by_id(chat, &[msg_id]).await?[0] {
                 // 存储msg
                 info!("找到消息 >> {}@{}", msg_id, chat.id());
@@ -154,7 +135,6 @@ impl AddChat {
                     .persist
                     .put_message(message::ActiveModel::from_inner_msg(&msg, source))
                     .await?;
-                rate_limit.tick().await;
             } else {
                 info!("未找到消息 >> {}@{}", msg_id, chat.id());
             };
@@ -167,9 +147,6 @@ impl AddChat {
         context: Context,
         msg_request: &Sender<ChatMessageExt>,
         history_request: &Sender<PackedChat>,
-        unpack_limit: &mut Interval,
-        resolve_limit: &mut Interval,
-        join_limit: &mut Interval,
     ) -> Result<()> {
         let chat_name = &chat_msg.username; // 群组名
 
@@ -182,7 +159,7 @@ impl AddChat {
             // 从Model读取PackedChat
             let packed_chat = chat.to_packed()?;
             // 限制unpack频率
-            unpack_limit.tick().await;
+            context.interval.unpack_chat.tick().await;
             // 用Client解包PackedChat，并返回
             let chat = context.client.unpack_chat(packed_chat).await?;
             chat
@@ -190,7 +167,7 @@ impl AddChat {
             // 未采集
             warn!("新采集群组名 >> {}", chat_name);
             // 限制resolve频率
-            resolve_limit.tick().await;
+            context.interval.resolve_username.tick().await;
             let chat = context.client.resolve_username(chat_name).await;
             if matches!(chat, Err(_)) {
                 // 查不到chat出错，放弃，搞下一个link
@@ -224,7 +201,7 @@ impl AddChat {
         };
 
         // 限制加入聊天频率
-        join_limit.tick().await;
+        context.interval.join_chat.tick().await;
 
         // 加入聊天
         if context.client.join_chat(&chat).await?.is_some() {
@@ -243,10 +220,9 @@ impl AddChat {
         invite: Invite,
         context: Context,
         history_request: &Sender<PackedChat>,
-        join_limit: &mut Interval,
     ) -> Result<()> {
         // 限制加入聊天频率
-        join_limit.tick().await;
+        context.interval.join_chat.tick().await;
         let update_chat = match context
             .client
             .accept_invite_link(&invite.invite_link)
@@ -283,8 +259,6 @@ impl AddChat {
         may_channel: MaybeChannel,
         context: Context,
         history_request: &mut Sender<PackedChat>,
-        resolve_limit: &mut Interval,
-        join_limit: &mut Interval,
     ) -> Result<()> {
         if context
             .persist
@@ -296,7 +270,7 @@ impl AddChat {
             return Ok(());
         }
 
-        resolve_limit.tick().await;
+        context.interval.resolve_username.tick().await;
 
         if let Some(chat) = context
             .client
@@ -304,7 +278,7 @@ impl AddChat {
             .await?
         {
             // 限制加入聊天频率
-            join_limit.tick().await;
+            context.interval.join_chat.tick().await;
             context.client.join_chat(chat.pack()).await?;
 
             history_request.send(chat.pack()).await?;
@@ -324,8 +298,6 @@ pub async fn fetch_chat_history(
     context: Context,
     limit: usize,
 ) -> Result<()> {
-    let mut msg_fetch_freq = tokio::time::interval(Duration::from_millis(20));
-
     while let Some(chat) = recv.recv().await {
         let source = Source::from_chat(chat.id);
         let history_span = info_span!(
@@ -335,20 +307,16 @@ pub async fn fetch_chat_history(
         );
         let _span = history_span.enter();
 
-        let mut history = context
-            .client
-            .iter_messages(chat)
-            .limit(limit)
-            .max_date(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("时间不够倒退")
-                    .as_secs() as i32,
-            );
+        let mut history = context.client.iter_messages(chat).limit(limit).max_date(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("时间不够倒退")
+                .as_secs() as i32,
+        );
 
         let mut count = 0;
         while let Some(Some(msg)) = history.next().await.unwrap_or_warn() {
-            msg_fetch_freq.tick().await;
+            context.interval.find_msg.tick().await;
             count += 1;
 
             info!("获取消息 > {}/{} >> {:?}", count, limit, source);

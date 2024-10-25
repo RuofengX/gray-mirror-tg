@@ -22,18 +22,12 @@ use crate::{
     PrintError,
 };
 
-pub const JOIN_CHAT_FREQ: Duration = std::time::Duration::from_secs(60);
-pub const RESOLVE_USER_NAME_FREQ: Duration = std::time::Duration::from_secs(10);
-pub const UNPACK_CHAT_FREQ: Duration = std::time::Duration::from_millis(500);
-pub const FIND_MSG_FREQ: Duration = std::time::Duration::from_millis(500);
 pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);
-pub const BOT_RESEND_FREQ: Duration = std::time::Duration::from_secs(30);
-
-pub const CHAT_HISTORY_LIMIT: usize = 10000;
 
 pub struct ContextInner {
     pub client: Client,
     pub persist: Database,
+    pub interval: IntervalSet,
     background_tasks: Mutex<JoinSet<()>>,
     update_sender: Sender<Update>,
 }
@@ -80,6 +74,7 @@ impl Context {
             update_sender: s,
             background_tasks: Mutex::new(background_tasks),
             persist: Database::new().await?,
+            interval: Default::default(),
         }));
 
         Ok(rtn)
@@ -177,5 +172,40 @@ impl Context {
         }
         warn!("全部任务结束");
         Ok(())
+    }
+}
+
+pub struct Interval(Mutex<tokio::time::Interval>);
+impl Interval {
+    pub fn from_secs(freq: u64) -> Self {
+        Self(Mutex::new(tokio::time::interval(Duration::from_secs(freq))))
+    }
+    pub fn from_millis(freq: u64) -> Self {
+        Self(Mutex::new(tokio::time::interval(Duration::from_millis(
+            freq,
+        ))))
+    }
+
+    pub async fn tick(&self) -> () {
+        self.0.lock().await.tick().await;
+    }
+}
+
+pub struct IntervalSet {
+    pub join_chat: Interval,
+    pub unpack_chat: Interval,
+    pub resolve_username: Interval,
+    pub find_msg: Interval,
+    pub bot_resend: Interval,
+}
+impl Default for IntervalSet {
+    fn default() -> Self {
+        Self {
+            join_chat: Interval::from_secs(60),
+            bot_resend: Interval::from_secs(30),
+            resolve_username: Interval::from_secs(10),
+            unpack_chat: Interval::from_millis(500),
+            find_msg: Interval::from_millis(20),
+        }
     }
 }

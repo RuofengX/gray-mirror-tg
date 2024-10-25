@@ -5,6 +5,7 @@ pub mod chat;
 pub mod link;
 pub mod message;
 pub mod search;
+pub mod favorite;
 
 pub use link::Model;
 pub use message::MessageExt;

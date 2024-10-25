@@ -6,7 +6,7 @@ use sea_orm::{
 };
 use tracing::{debug, info_span};
 
-use crate::types::{chat, link, message, search};
+use crate::types::{chat, favorite, link, message, search};
 
 pub struct Database {
     pub db: DatabaseConnection,
@@ -51,6 +51,14 @@ impl Database {
             builder.build(
                 schema
                     .create_table_from_entity(chat::Entity)
+                    .if_not_exists(),
+            ),
+        )
+        .await?;
+        db.execute(
+            builder.build(
+                schema
+                    .create_table_from_entity(favorite::Entity)
                     .if_not_exists(),
             ),
         )

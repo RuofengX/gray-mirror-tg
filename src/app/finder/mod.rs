@@ -19,6 +19,7 @@ use super::{App, Updater};
 
 pub mod engine;
 pub mod soso;
+pub mod generic;
 pub mod watchdog;
 
 pub const KEYWORDS: [&str; 3] = [

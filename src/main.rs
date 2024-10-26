@@ -9,6 +9,7 @@ pub mod app;
 pub mod context;
 pub mod persist;
 pub mod types;
+pub mod service;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {

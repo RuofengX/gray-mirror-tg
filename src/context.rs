@@ -195,7 +195,7 @@ impl Default for IntervalSet {
     fn default() -> Self {
         Self {
             join_chat: Interval::from_secs(300),
-            bot_resend: Interval::from_secs(30),
+            bot_resend: Interval::from_secs(1200),
             resolve_username: Interval::from_secs(10),
             unpack_chat: Interval::from_millis(500),
             find_msg: Interval::from_millis(20),

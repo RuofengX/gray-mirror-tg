@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use crate::{
-    context::{Context, BOT_RESP_TIMEOUT},
+    context::Context,
     types::{search, Source},
     App, PrintError,
 };
@@ -13,6 +13,9 @@ use tracing::warn;
 
 pub mod engine;
 pub mod watchdog;
+
+pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);
+pub const BOT_RESEND_INTERVAL: Duration = std::time::Duration::from_secs(10);
 
 #[derive(Debug)]
 pub struct SearchLink {
@@ -34,7 +37,7 @@ impl App for SearchLink {
     }
     async fn ignite(&mut self, ctx: Context) -> Option<()> {
         // 新建计时器
-        let bot_resend = Arc::new(Mutex::new(tokio::time::interval(BOT_RESP_TIMEOUT)));
+        let bot_resend = Arc::new(Mutex::new(tokio::time::interval(BOT_RESEND_INTERVAL)));
         for keyword in &self.keywords {
             // 新建搜索
             warn!(keyword, "新建搜索");

@@ -8,10 +8,7 @@ use tokio::{
 };
 use tracing::{info, warn};
 
-use crate::{
-    context::{Context, BOT_RESP_TIMEOUT},
-    PrintError, Runable,
-};
+use crate::{app::search::bot::BOT_RESP_TIMEOUT, context::Context, PrintError, Runable};
 
 use super::engine::GenericEngine;
 
@@ -57,6 +54,7 @@ impl Runable for Watchdog {
                 let keyword = self.keyword;
                 info!(engine, keyword, "搜索超时",);
                 info!(engine, keyword, "重发送消息");
+                self.bot_resend_tick.lock().await.tick().await;
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)
                     .await

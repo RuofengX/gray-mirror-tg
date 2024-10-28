@@ -12,10 +12,11 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
-    channel::Channel, persist::Database, update::{UpdateApp, Updater}, App, PrintError, Runable
+    channel::Channel,
+    persist::Database,
+    update::{UpdateApp, Updater},
+    App, PrintError, Runable,
 };
-
-pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);
 
 #[derive(Clone)]
 pub struct Context(Arc<ContextInner>);
@@ -24,9 +25,9 @@ pub struct ContextInner {
     pub client: Client,
     pub persist: Database,
     pub interval: IntervalSet,
+    pub channel: Channel,
     background_tasks: Mutex<JoinSet<()>>,
     update: RwLock<UpdateApp>,
-    pub channel: Channel,
 }
 
 impl Deref for Context {
@@ -74,13 +75,12 @@ impl Context {
         Ok(rtn)
     }
 
-    pub async fn add_app(&self, mut value: impl App) ->(){
+    pub async fn add_app(&self, mut value: impl App) -> () {
         let ctx = self.clone();
-        warn!(app=value.name(), "添加应用");
-        if value.ignite(ctx).await.is_none(){
-            error!(app=value.name(), "应用启动失败");
+        warn!(app = value.name(), "添加应用");
+        if value.ignite(ctx).await.is_none() {
+            error!(app = value.name(), "应用启动失败");
         }
-
     }
 
     pub async fn add_runable(&self, mut value: impl Runable) -> () {

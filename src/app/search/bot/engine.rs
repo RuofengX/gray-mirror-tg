@@ -23,6 +23,11 @@ impl GenericEngine {
         },
     };
 
+    pub const JISO: GenericEngine = GenericEngine{
+        name: "JISO",
+        chat: PackedChat { ty: PackedType::Bot, id: 6213379764, access_hash: None }
+    };
+
     pub fn start_search(&self, keyword: &'static str, source: Source, time_sync: Arc<Mutex<Instant>>) -> impl Updater {
         Scraper::new(
             self.clone(),

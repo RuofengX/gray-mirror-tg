@@ -52,7 +52,7 @@ impl Context {
         if loki_url != "" {
             let (layer, task) = tracing_loki::builder()
                 .label("service_name", "gray-mirror-tg")?
-                // .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
+                .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
                 .build_url(Url::parse(&loki_url)?)?;
 
             background_tasks.spawn(async move {
@@ -143,7 +143,7 @@ pub struct IntervalSet {
 impl Default for IntervalSet {
     fn default() -> Self {
         Self {
-            join_chat: Interval::from_secs(180),
+            join_chat: Interval::from_secs(300),
             bot_resend: Interval::from_secs(15),
             resolve_username: Interval::from_secs(10),
             unpack_chat: Interval::from_millis(500),

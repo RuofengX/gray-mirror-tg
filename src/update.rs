@@ -66,8 +66,8 @@ pub trait Updater: Send + Sync + 'static {
             raw_msg.outgoing().then(|| flag = false);
         }
 
-        if let Some(ids) = self.filter_chat_id() {
-            if !ids.contains(&raw_msg.chat().id()) {
+        if let Some(id) = self.filter_chat_id() {
+            if raw_msg.chat().id() != id {
                 flag = false;
             }
         }
@@ -85,7 +85,7 @@ pub trait Updater: Send + Sync + 'static {
         true
     }
 
-    fn filter_chat_id(&self) -> Option<&[i64]> {
+    fn filter_chat_id(&self) -> Option<i64> {
         None
     }
 

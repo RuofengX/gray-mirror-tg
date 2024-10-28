@@ -84,10 +84,8 @@ impl Database {
             .one(&self.db)
             .await?;
         if let Some(exist) = exist {
-            debug!("重复");
             Ok(exist)
         } else {
-            debug!("排除重复");
             let rtn = chat::Entity::insert(data)
                 .on_conflict(
                     OnConflict::column(chat::Column::ChatId)
@@ -101,16 +99,8 @@ impl Database {
     }
 
     pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
-        let exist = link::Entity::find()
-            .filter(link::Column::Link.eq(data.link.clone().into_value().unwrap()))
-            .one(&self.db)
-            .await?;
-        if let Some(exist) = exist {
-            Ok(exist)
-        } else {
-            let rtn = data.insert(&self.db).await?;
-            Ok(rtn)
-        }
+        let rtn = data.insert(&self.db).await?;
+        Ok(rtn)
     }
 
     pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {

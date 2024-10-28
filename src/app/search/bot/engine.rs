@@ -4,6 +4,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::{session::PackedType, types::PackedChat};
 use tokio::{sync::Mutex, time::Instant};
+use tracing::info;
 
 use crate::{message, Context, MessageExt, Source, Updater};
 
@@ -23,18 +24,34 @@ impl GenericEngine {
         },
     };
 
-    pub const JISO: GenericEngine = GenericEngine{
-        name: "JISO",
-        chat: PackedChat { ty: PackedType::Bot, id: 6213379764, access_hash: None }
+    pub const JISOU: GenericEngine = GenericEngine {
+        name: "jiso2bot",
+        chat: PackedChat {
+            ty: PackedType::Bot,
+            id: 6213379764,
+            access_hash: Some(7074953819817629361),
+        },
     };
 
-    pub fn start_search(&self, keyword: &'static str, source: Source, time_sync: Arc<Mutex<Instant>>) -> impl Updater {
-        Scraper::new(
-            self.clone(),
-            keyword,
-            source,
-            time_sync,
-        )
+    pub async fn new(username: &'static str, ctx: Context) -> Result<Option<Self>> {
+        ctx.interval.resolve_username.tick().await;
+        if let Some(chat) = ctx.client.resolve_username(username).await? {
+            Ok(Some(Self {
+                name: username,
+                chat: chat.pack(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn start_search(
+        &self,
+        keyword: &'static str,
+        source: Source,
+        time_sync: Arc<Mutex<Instant>>,
+    ) -> impl Updater {
+        Scraper::new(self.clone(), keyword, source, time_sync)
     }
 }
 
@@ -47,7 +64,6 @@ pub struct Scraper {
 }
 
 impl Scraper {
-    pub const ENGINE: GenericEngine = GenericEngine::SOSO;
     pub fn new(
         engine: GenericEngine,
         keyword: &'static str,
@@ -80,6 +96,7 @@ impl Updater for Scraper {
 
         let link_source = Source::from_message(msg_id);
         for link in msg.links() {
+            info!(desc=link.desc, "接收链接");
             context
                 .persist
                 .put_link(link.to_model(&link_source))
@@ -113,11 +130,11 @@ impl Updater for Scraper {
         true
     }
 
-    fn filter_chat_id(&self) -> Option<&[i64]> {
-        Some(&[Self::ENGINE.chat.id])
+    fn filter_chat_id(&self) -> Option<i64> {
+        Some(self.engine.chat.id)
     }
 
     fn filter_word(&self) -> Option<String> {
-        Some(format!("关键词：{}", self.keyword))
+        Some(format!("{}", self.keyword))
     }
 }

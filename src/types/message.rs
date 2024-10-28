@@ -8,7 +8,7 @@ use grammers_client::grammers_tl_types::{self as tl, types::KeyboardButtonCallba
 use grammers_client::Client;
 use sea_orm::entity::prelude::*;
 use sea_orm::Set;
-use tracing::{info, info_span, warn};
+use tracing::{info, warn};
 
 use super::{link, Source, SourceType};
 
@@ -41,9 +41,6 @@ impl MessageExt {
     }
 
     pub fn links(&self) -> Vec<link::Link> {
-        let fetch_span = info_span!("提取消息内文本链接");
-        let _span = fetch_span.enter();
-
         let mut rtn = Vec::new();
         let words: Vec<u16> = self.inner.raw.message.encode_utf16().collect();
 
@@ -55,11 +52,8 @@ impl MessageExt {
 
                         let offset = url.offset as usize;
                         let len = url.length as usize;
-                        let fetch_span = info_span!("处理链接偏移", offset, len);
-                        let _span = fetch_span.enter();
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
-                            info!("{}", desc);
                             rtn.push(link::Link { link, desc });
                         } else {
                             warn!("提取链接时错误");
@@ -74,9 +68,6 @@ impl MessageExt {
     }
 
     pub fn callback_buttons(&self) -> Vec<KeyboardButtonCallback> {
-        let fetch_button_span = info_span!("提取反馈按钮");
-        let _span = fetch_button_span.enter();
-
         let reply_markup = &self.inner.raw.reply_markup;
 
         let mut rtn = Vec::new();

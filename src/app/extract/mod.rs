@@ -27,11 +27,9 @@ impl Runable for ScanLink {
         let db = &ctx.persist.db;
         loop {
             // 从数据库获取一批链接
-            while let Some(links) = link::Entity::find()
-                .paginate(db, 60)
-                .fetch_and_next()
-                .await?
-            {
+            warn!("开始扫描全部链接");
+            let mut pages = link::Entity::find().paginate(db, 60);
+            while let Some(links) = pages.fetch_and_next().await? {
                 // 将链接尝试转换为 (群组名-消息id) 结构
                 let msg_link_vec: Vec<LinkParse> = links
                     .into_iter()
@@ -78,6 +76,7 @@ impl Runable for ScanLink {
                     }
                 }
             }
+            warn!("扫描全部链接完成");
         }
     }
 }

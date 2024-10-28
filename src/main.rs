@@ -1,6 +1,5 @@
 use anyhow::Result;
 use app::search::engine::GenericEngine;
-use tokio;
 
 pub mod abstruct;
 pub mod app;
@@ -28,7 +27,7 @@ async fn main() -> Result<()> {
     let ctx = Context::new().await?;
 
     ctx.add_app(app::SearchLink::new(
-        GenericEngine::SOSO,
+        GenericEngine::JISOU,
         KEYWORDS.into_iter(),
     ))
     .await;

@@ -17,6 +17,7 @@ use url::Url;
 
 use crate::{
     app::{self, App, UpdateRuntime, Updater},
+    runable::Runable,
     persist::Database,
     types::chat,
     PrintError,
@@ -29,7 +30,6 @@ pub struct ContextInner {
     pub persist: Database,
     pub interval: IntervalSet,
     background_tasks: Mutex<JoinSet<()>>,
-    update_sender: Sender<Update>,
 }
 
 #[derive(Clone)]
@@ -45,7 +45,6 @@ impl Deref for Context {
 
 impl Context {
     pub async fn new() -> Result<Self> {
-        let (s, _r) = broadcast::channel(1024);
         let mut background_tasks = JoinSet::new();
 
         let logger = tracing_subscriber::registry();
@@ -71,7 +70,6 @@ impl Context {
 
         let rtn = Self(Arc::new(ContextInner {
             client: crate::login::login_with_dotenv().await?,
-            update_sender: s,
             background_tasks: Mutex::new(background_tasks),
             persist: Database::new().await?,
             interval: Default::default(),
@@ -80,6 +78,7 @@ impl Context {
         Ok(rtn)
     }
 
+    #[deprecated]
     pub async fn add_app(&self, mut app: impl App + 'static) -> Result<()> {
         let span = info_span!("应用", name = format!("{}", app));
         let _span = span.enter();
@@ -89,6 +88,7 @@ impl Context {
         Ok(())
     }
 
+    #[deprecated]
     pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()> {
         let span = info_span!("更新处理器", updater = format!("{}", updater));
 
@@ -101,6 +101,7 @@ impl Context {
         Ok(())
     }
 
+    #[deprecated]
     pub async fn add_background_task(
         &self,
         span: Span,
@@ -114,6 +115,14 @@ impl Context {
             }
             .instrument(span),
         );
+    }
+
+    pub async fn add_runable(&self, mut value: impl Runable) -> () {
+        let ctx = self.clone();
+        self.background_tasks
+            .lock()
+            .await
+            .spawn(async move { value.run(ctx).await.into_log() });
     }
 
     pub async fn enable_update(&self) -> Result<()> {

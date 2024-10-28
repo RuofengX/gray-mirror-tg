@@ -1,25 +1,20 @@
 use anyhow::Result;
-use async_trait::async_trait;
 use grammers_client::types::{Dialog, Message as RawMessage};
 use tracing::info;
 
 use crate::{
-    app::{App, Updater},
+    app::App,
     context::Context,
     types::{chat, message, MessageExt, Source},
 };
+
+use super::update::Updater;
 
 pub struct GrayMirror;
 impl GrayMirror {
     const NAME: &str = "灰镜";
     pub fn new() -> Self {
         Self {}
-    }
-}
-
-impl std::fmt::Display for GrayMirror {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Self::NAME.fmt(f)
     }
 }
 

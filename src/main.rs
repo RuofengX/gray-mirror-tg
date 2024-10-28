@@ -7,9 +7,11 @@ pub mod error;
 pub mod login;
 pub mod persist;
 pub mod types;
-pub mod interface;
+pub mod abstruct;
 
 pub use error::PrintError;
+pub use abstruct::*;
+pub use types::*;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {

@@ -40,55 +40,6 @@ pub trait Updater: Display + Send + Sync {
         Ok(())
     }
 
-    /// Occurs when a message is deleted.
-    ///
-    /// * return Some(Result<()>) if parsed;
-    /// * return None if not parsed
-    async fn message_deletion_raw(
-        &mut self,
-        _context: Context,
-        _msg_del: MessageDeletion,
-    ) -> Option<Result<()>> {
-        None
-    }
-
-    /// Occurs when Telegram calls back into your bot because an inline callback
-    /// button was pressed.
-    ///
-    /// * return Some(Result<()>) if parsed;
-    /// * return None if not parsed
-    async fn callback_query_raw(
-        &mut self,
-        _context: Context,
-        _callback_query: CallbackQuery,
-    ) -> Option<Result<()>> {
-        None
-    }
-
-    /// Occurs whenever you sign in as a bot and a user sends an inline query
-    /// such as `@bot query`.
-    ///
-    /// * return Some(Result<()>) if parsed;
-    /// * return None if not parsed
-    async fn inline_query_raw(
-        &mut self,
-        _context: Context,
-        _inline_query: InlineQuery,
-    ) -> Option<Result<()>> {
-        None
-    }
-
-    /// Represents an update of user choosing the result of inline query and sending it to their chat partner.
-    ///
-    /// * return Some(Result<()>) if parsed;
-    /// * return None if not parsed
-    async fn inline_send_raw(
-        &mut self,
-        _context: Context,
-        _inline_send: InlineSend,
-    ) -> Option<Result<()>> {
-        None
-    }
 
     /// DO NOT RELOAD THIS FUNCTION
     /// UNLESS YOU KNOW WHAT YOU DO
@@ -117,16 +68,6 @@ pub trait Updater: Display + Send + Sync {
                         None
                     }
                 }
-                Update::MessageDeleted(msg_del) => {
-                    self.message_deletion_raw(context, msg_del).await
-                }
-                Update::CallbackQuery(callback_query) => {
-                    self.callback_query_raw(context, callback_query).await
-                }
-                Update::InlineQuery(inline_query) => {
-                    self.inline_query_raw(context, inline_query).await
-                }
-                Update::InlineSend(inline_send) => self.inline_send_raw(context, inline_send).await,
                 Update::Raw(_) => None,
                 _ => None,
             }

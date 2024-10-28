@@ -1,20 +1,25 @@
 use anyhow::Result;
-use context::Context;
+use app::search::engine::GenericEngine;
 use tokio;
+
+pub mod abstruct;
 pub mod app;
+pub mod channel;
 pub mod context;
 pub mod error;
 pub mod login;
 pub mod persist;
 pub mod types;
-pub mod abstruct;
 pub mod update;
 
-pub use error::PrintError;
 pub use abstruct::*;
-pub use types::*;
 pub use app::App;
+pub use context::Context;
+pub use error::PrintError;
+pub use types::*;
 pub use update::Updater;
+
+const KEYWORDS: [&str; 5] = ["柏盛", "财神", "菩萨", "园区", "担保"];
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {
@@ -22,13 +27,17 @@ async fn main() -> Result<()> {
 
     let ctx = Context::new().await?;
 
-    ctx.add_update_parser().await?;
-    // ctx.fetch_all_chat_history(100000).await?;
-    ctx.fetch_all_chat_history(100).await?; // 防止错过消息
+    ctx.add_app(app::SearchLink::new(
+        GenericEngine::SOSO,
+        KEYWORDS.into_iter(),
+    ))
+    .await;
+    // ctx.add_app(app::FullMirror::new(100)).await;
+    ctx.add_runable(app::ScanLink::new()).await;
+    ctx.add_runable(app::UpdateMirror::new(10_0000)).await;
+    ctx.add_parser(app::LiveMirror::default()).await;
 
-    ctx.add_app(app::gray_mirror::GrayMirror::new()).await?;
-    ctx.add_app(app::finder::Search::default()).await?;
-    ctx.add_app(app::fetch_chat::AddChat::new()).await?;
+    ctx.start_update_parser().await;
     ctx.run().await?;
 
     Ok(())

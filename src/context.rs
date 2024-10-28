@@ -1,29 +1,24 @@
-use std::{future::Future, ops::Deref, sync::{Arc, OnceLock}, time::Duration};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use grammers_client::{types::PackedChat, Client, Update};
-use sea_orm::{EntityTrait, PaginatorTrait};
+use grammers_client::Client;
 use tokio::{
-    sync::{
-        broadcast::{self, Sender},
-        Mutex, RwLock,
-    },
+    sync::{Mutex, RwLock},
     task::JoinSet,
 };
-use tracing::{debug, info, info_span, level_filters::STATIC_MAX_LEVEL, warn, Instrument, Span};
+use tracing::{error, level_filters::STATIC_MAX_LEVEL, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
-    app::{self, App},
-    chat,
-    persist::Database,
-    update::{UpdateApp, Updater},
-    PrintError, Runable,
+    channel::Channel, persist::Database, update::{UpdateApp, Updater}, App, PrintError, Runable
 };
 
 pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);
+
+#[derive(Clone)]
+pub struct Context(Arc<ContextInner>);
 
 pub struct ContextInner {
     pub client: Client,
@@ -31,10 +26,8 @@ pub struct ContextInner {
     pub interval: IntervalSet,
     background_tasks: Mutex<JoinSet<()>>,
     update: RwLock<UpdateApp>,
+    pub channel: Channel,
 }
-
-#[derive(Clone)]
-pub struct Context(Arc<ContextInner>);
 
 impl Deref for Context {
     type Target = ContextInner;
@@ -58,7 +51,7 @@ impl Context {
         if loki_url != "" {
             let (layer, task) = tracing_loki::builder()
                 .label("service_name", "gray-mirror-tg")?
-                .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
+                // .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
                 .build_url(Url::parse(&loki_url)?)?;
 
             background_tasks.spawn(async move {
@@ -73,34 +66,21 @@ impl Context {
             client: crate::login::login_with_dotenv().await?,
             background_tasks: Mutex::new(background_tasks),
             persist: Database::new().await?,
-            interval: Default::default(),
             update: RwLock::new(UpdateApp::new()),
+            interval: Default::default(),
+            channel: Default::default(),
         }));
 
         Ok(rtn)
     }
 
-    #[deprecated]
-    pub async fn add_app(&self, mut app: impl App + 'static) -> Result<()> {
-        warn!("初始化(ignite)");
-        app.ignite(self.clone()).in_current_span().await?;
-        Ok(())
-    }
+    pub async fn add_app(&self, mut value: impl App) ->(){
+        let ctx = self.clone();
+        warn!(app=value.name(), "添加应用");
+        if value.ignite(ctx).await.is_none(){
+            error!(app=value.name(), "应用启动失败");
+        }
 
-    #[deprecated]
-    pub async fn add_background_task(
-        &self,
-        span: Span,
-        task: impl Future<Output = Result<()>> + Send + 'static,
-    ) -> () {
-        self.background_tasks.lock().await.spawn(
-            async move {
-                info!("启动");
-                task.await.into_log();
-                info!("退出");
-            }
-            .instrument(span),
-        );
     }
 
     pub async fn add_runable(&self, mut value: impl Runable) -> () {
@@ -111,41 +91,21 @@ impl Context {
             .spawn(async move { value.run(ctx).await.into_log() });
     }
 
-    pub async fn add_update_parser(&self, value: impl Updater) -> () {
+    pub async fn add_parser(&self, value: impl Updater) -> () {
         let mut update = self.update.write().await;
         update.add_parser(value);
     }
 
     pub async fn start_update_parser(&self) -> () {
-        let updater = self.update.write().await.clone();
-        self.add_runable(updater).await;
-    }
-
-    pub async fn fetch_all_chat_history(&self, limit: usize) -> Result<()> {
-        let (send, recv) = tokio::sync::mpsc::channel(64);
-        let ctx = self.clone();
-        self.add_background_task(info_span!("全库聊天历史"), async move {
-            app::fetch_chat::fetch_chat_history(recv, ctx, limit).await?;
-            Ok(())
-        })
-        .await;
-
-        let mut iter = chat::Entity::find()
-            .into_partial_model::<chat::PackedChatOnly>()
-            .paginate(&self.persist.db, 8);
-        while let Some(chats) = iter.fetch_and_next().await? {
-            for chat in chats {
-                send.send(PackedChat::from_hex(&chat.packed)?).await?;
-            }
-        }
-        Ok(())
+        let mut updater = self.update.write().await;
+        let mut buf = UpdateApp::new();
+        std::mem::swap(&mut *updater, &mut buf);
+        self.add_runable(buf).await;
     }
 
     /// Run until error occurs. Return first error.
     pub async fn run(self) -> Result<()> {
         while let Some(result) = self.background_tasks.lock().await.join_next().await {
-            let span = info_span!("守护进程");
-            let _span = span.enter();
             result.unwrap_or_log();
         }
         warn!("全部任务结束");
@@ -180,7 +140,7 @@ impl Default for IntervalSet {
     fn default() -> Self {
         Self {
             join_chat: Interval::from_secs(300),
-            bot_resend: Interval::from_secs(1200),
+            bot_resend: Interval::from_secs(15),
             resolve_username: Interval::from_secs(10),
             unpack_chat: Interval::from_millis(500),
             find_msg: Interval::from_millis(20),

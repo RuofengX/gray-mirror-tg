@@ -5,7 +5,6 @@ pub mod chat;
 pub mod link;
 pub mod message;
 pub mod search;
-pub mod favorite;
 
 pub use link::Model;
 pub use message::MessageExt;
@@ -25,7 +24,6 @@ pub enum SourceType {
     Chat,
     #[sea_orm(string_value = "")]
     Manual,
-    // TODO: 添加群组爬虫的来源
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

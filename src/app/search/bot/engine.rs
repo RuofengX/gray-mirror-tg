@@ -1,61 +1,75 @@
-//! TODO:
+use std::{sync::Arc, time::Duration};
 
-use std::{fmt::Display, sync::Arc, time::Duration};
-
-use crate::{
-    app::Updater,
-    context::Context,
-    types::{message, MessageExt, Source},
-};
 use anyhow::Result;
 use async_trait::async_trait;
+use grammers_client::{session::PackedType, types::PackedChat};
 use tokio::{sync::Mutex, time::Instant};
-use tracing::info_span;
 
-use super::engine::Engine;
+use crate::{message, Context, MessageExt, Source, Updater};
+
+#[derive(Debug, Clone, Copy)]
+pub struct GenericEngine {
+    pub name: &'static str,
+    pub chat: PackedChat,
+}
+
+impl GenericEngine {
+    pub const SOSO: GenericEngine = GenericEngine {
+        name: "SOSO",
+        chat: PackedChat {
+            ty: PackedType::Bot,
+            id: 7048419795,
+            access_hash: Some(7758671014432728719),
+        },
+    };
+
+    pub fn start_search(&self, keyword: &'static str, source: Source, time_sync: Arc<Mutex<Instant>>) -> impl Updater {
+        Scraper::new(
+            self.clone(),
+            keyword,
+            source,
+            time_sync,
+        )
+    }
+}
 
 #[derive(Debug)]
-pub struct GenericSession {
-    //TODO: 改为通用型搜索，
+pub struct Scraper {
     pub keyword: &'static str,
-    pub engine: Engine,
     pub source: Source,
+    pub engine: GenericEngine,
     last_update: Arc<Mutex<Instant>>,
 }
 
-impl GenericSession {
-    pub const ENGINE: Engine = Engine::SOSO;
+impl Scraper {
+    pub const ENGINE: GenericEngine = GenericEngine::SOSO;
     pub fn new(
-        _context: Context,
+        engine: GenericEngine,
         keyword: &'static str,
         source: Source,
         last_update: Arc<Mutex<Instant>>,
     ) -> Self {
-        GenericSession {
+        Scraper {
             keyword,
             source,
-            engine: Engine::SOSO,
+            engine,
             last_update,
         }
     }
 }
 
-impl Display for GenericSession {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{}_{}", self.engine.name, self.keyword))?;
-        Ok(())
-    }
-}
-
 #[async_trait]
-impl Updater for GenericSession {
+impl Updater for Scraper {
+    fn name(&self) -> &'static str {
+        self.engine.name
+    }
     async fn message_recv(&mut self, context: Context, msg: MessageExt) -> Result<()> {
-        let new_span = info_span!("处理新消息");
-        let _span = new_span.enter();
-
         let msg_id = context
             .persist
-            .put_message(message::ActiveModel::from_inner_msg(&msg.inner, self.source))
+            .put_message(message::ActiveModel::from_inner_msg(
+                &msg.inner,
+                self.source,
+            ))
             .await?
             .msg_id;
 

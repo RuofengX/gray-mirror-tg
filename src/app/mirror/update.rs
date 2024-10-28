@@ -1,30 +1,26 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::types::{Dialog, Message as RawMessage};
+use grammers_client::types::Message as RawMessage;
 use tracing::info;
 
 use crate::{
     context::Context,
-    types::{chat, message, MessageExt, Source}, update::Updater,
+    types::{message, MessageExt, Source},
+    update::Updater,
 };
 
 #[derive(Debug, Default)]
-pub struct GrayMirror;
-impl GrayMirror {
-    const NAME: &str = "灰镜";
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct LiveMirror;
 
 #[async_trait]
-impl Updater for GrayMirror {
+impl Updater for LiveMirror {
     fn name(&self) -> &'static str {
-        "全量镜像"
+        "增量消息镜像"
     }
     async fn message_recv(&mut self, context: Context, msg: MessageExt) -> Result<()> {
-        let source = Source::from_chat(msg.inner.chat().id());
-        info!(source_id = source.id, "接收更新");
+        let chat = msg.inner.chat();
+        info!(chat_id = chat.id(), "接收更新");
+        let source = Source::from_chat(chat.id());
         context
             .persist
             .put_message(message::ActiveModel::from_inner_msg(&msg.inner, source))
@@ -57,18 +53,4 @@ impl Updater for GrayMirror {
 
         flag
     }
-}
-
-pub async fn fetch_all_joined_group(context: Context) -> Result<()> {
-    let mut dialogs = context.client.iter_dialogs();
-    while let Some(Dialog { chat, .. }) = dialogs.next().await? {
-        if context.persist.find_chat(chat.username()).await?.is_some() {
-            continue;
-        }
-        context
-            .persist
-            .put_chat(chat::ActiveModel::from_chat(&chat, Source::from_manual()))
-            .await?;
-    }
-    Ok(())
 }

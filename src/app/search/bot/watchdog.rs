@@ -2,28 +2,38 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::{sync::Mutex, time::Instant};
-use tracing::{info, info_span, warn};
+use tokio::{
+    sync::Mutex,
+    time::{Instant, Interval},
+};
+use tracing::{info, warn};
 
 use crate::{
     context::{Context, BOT_RESP_TIMEOUT},
     PrintError, Runable,
 };
 
-use super::engine::Engine;
+use super::engine::GenericEngine;
 
 pub struct Watchdog {
-    engine: Engine,
+    engine: GenericEngine,
     keyword: &'static str,
     last_update: Arc<Mutex<Instant>>,
+    bot_resend_tick: Arc<Mutex<Interval>>,
 }
 
 impl Watchdog {
-    pub fn new(engine: Engine, keyword: &'static str, last_update: Arc<Mutex<Instant>>) -> Self {
+    pub fn new(
+        engine: GenericEngine,
+        keyword: &'static str,
+        last_update: Arc<Mutex<Instant>>,
+        bot_resend_tick: Arc<Mutex<Interval>>,
+    ) -> Self {
         Watchdog {
             engine,
             keyword,
             last_update,
+            bot_resend_tick,
         }
     }
 }
@@ -34,17 +44,19 @@ impl Runable for Watchdog {
         "搜索看门狗"
     }
     async fn run(&mut self, ctx: Context) -> Result<()> {
-        info!("发送初始消息");
+        self.bot_resend_tick.lock().await.tick().await;
+        warn!("发送初始消息");
         ctx.client
             .send_message(self.engine.chat, self.keyword)
             .await?;
 
         loop {
-            ctx.interval.bot_resend.tick().await;
             let mut last = self.last_update.lock().await;
             if tokio::time::Instant::now() - *last > BOT_RESP_TIMEOUT {
-                info!(keyword = self.keyword, "搜索超时",);
-                info!("重发送消息");
+                let engine = self.engine.name;
+                let keyword = self.keyword;
+                info!(engine, keyword, "搜索超时",);
+                info!(engine, keyword, "重发送消息");
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)
                     .await

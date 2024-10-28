@@ -67,13 +67,18 @@ impl ActiveModel {
 }
 
 impl Model {
-    pub fn to_packed(&self) -> Result<PackedChat> {
+    pub fn packed(&self) -> Result<PackedChat> {
         Ok(PackedChat::from_hex(&self.packed)?)
     }
 }
 
-#[derive(DerivePartialModel, FromQueryResult)]
+#[derive(Debug, DerivePartialModel, FromQueryResult)]
 #[sea_orm(entity = "Entity")]
-pub struct PackedChatOnly{
-    pub packed: String,
+pub struct PackedChatOnly {
+    packed: String,
+}
+impl PackedChatOnly {
+    pub fn packed(&self) -> Result<PackedChat> {
+        Ok(PackedChat::from_hex(&self.packed)?)
+    }
 }

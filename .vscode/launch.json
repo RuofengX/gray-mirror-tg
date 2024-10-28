@@ -21,6 +21,7 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+            
         },
         {
             "type": "lldb",

@@ -43,10 +43,21 @@ pub enum LinkParse {
     Invite(Invite),
     MaybeChannel(MaybeChannel),
 }
+impl LinkParse {
+    pub fn source(&self) -> Source {
+        match self {
+            LinkParse::ChatMessage(cm) => cm.source,
+            LinkParse::Invite(i) => i.source,
+            LinkParse::MaybeChannel(mc) => mc.source,
+        }
+    }
+}
 impl TryFrom<link::Model> for LinkParse {
     type Error = anyhow::Error;
 
     fn try_from(value: link::Model) -> Result<Self> {
+        //TODO: 添加t.me开头的判断
+
         let url = Url::parse(&value.link)?;
         let source = Source::from_link(&value);
         let mut path = url

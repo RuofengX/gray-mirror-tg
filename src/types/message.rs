@@ -103,9 +103,6 @@ impl MessageExt {
         button: &KeyboardButtonCallback,
         delay: Duration,
     ) -> Result<()> {
-        let click_button_span = info_span!("点击反馈按钮");
-        let _span = click_button_span.enter();
-
         tokio::time::sleep(delay).await;
         info!("{}", button.text);
         client

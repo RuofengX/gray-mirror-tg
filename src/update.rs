@@ -6,11 +6,11 @@ use tokio::{
     task::JoinSet,
 };
 
-use crate::{context::Context, types::MessageExt, App, PrintError, Runable};
+use crate::{context::Context, types::MessageExt, PrintError, Runable};
 
 /// 匹配器，以供部分实现
 #[async_trait]
-pub trait Updater: Send + Sync {
+pub trait Updater: Send + Sync + 'static {
     fn name(&self) -> &'static str;
 
     /// Occurs whenever a new text message or a message with media is produced.
@@ -96,14 +96,13 @@ pub trait Updater: Send + Sync {
     // fn filter_text(&self)
 }
 
-#[derive(Debug, Clone)]
 pub struct UpdateApp {
     parser: Vec<UpdateParser>,
     tx: broadcast::Sender<Update>,
 }
 impl UpdateApp {
     pub fn new() -> Self {
-        let (tx, rx) = broadcast::channel(2048);
+        let (tx, _) = broadcast::channel(2048);
         Self {
             parser: Vec::new(),
             tx,
@@ -126,19 +125,15 @@ impl Runable for UpdateApp {
     }
     async fn run(&mut self, ctx: Context) -> Result<()> {
         let mut tasks = JoinSet::new();
-        for i in self.parser {
-            tasks.spawn(i.run(ctx.clone()));
+        while let Some(mut i) = self.parser.pop() {
+            let ctxx = ctx.clone();
+            tasks.spawn(async move { i.run(ctxx).await });
         }
-        tasks.spawn(UpdateListener::new(self.tx.clone()).run(ctx.clone()));
+        let mut listener = UpdateListener::new(self.tx.clone());
+        tasks.spawn(async move { listener.run(ctx).await });
         while let Some(task) = tasks.join_next().await {
             task?.into_log();
         }
-        Ok(())
-    }
-}
-impl App for UpdateApp {
-    async fn ignite(&mut self, ctx: Context) -> Result<()> {
-        ctx.add_runable(self.clone()).await;
         Ok(())
     }
 }

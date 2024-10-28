@@ -8,10 +8,13 @@ pub mod login;
 pub mod persist;
 pub mod types;
 pub mod abstruct;
+pub mod update;
 
 pub use error::PrintError;
 pub use abstruct::*;
 pub use types::*;
+pub use app::App;
+pub use update::Updater;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {
@@ -19,7 +22,7 @@ async fn main() -> Result<()> {
 
     let ctx = Context::new().await?;
 
-    ctx.enable_update().await?;
+    ctx.add_update_parser().await?;
     // ctx.fetch_all_chat_history(100000).await?;
     ctx.fetch_all_chat_history(100).await?; // 防止错过消息
 

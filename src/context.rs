@@ -1,4 +1,4 @@
-use std::{future::Future, ops::Deref, sync::Arc, time::Duration};
+use std::{future::Future, ops::Deref, sync::{Arc, OnceLock}, time::Duration};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
@@ -7,7 +7,7 @@ use sea_orm::{EntityTrait, PaginatorTrait};
 use tokio::{
     sync::{
         broadcast::{self, Sender},
-        Mutex,
+        Mutex, RwLock,
     },
     task::JoinSet,
 };
@@ -16,11 +16,11 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
-    app::{self, App, UpdateRuntime, Updater},
-    runable::Runable,
+    app::{self, App},
+    chat,
     persist::Database,
-    types::chat,
-    PrintError,
+    update::{UpdateApp, Updater},
+    PrintError, Runable,
 };
 
 pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(120);
@@ -30,6 +30,7 @@ pub struct ContextInner {
     pub persist: Database,
     pub interval: IntervalSet,
     background_tasks: Mutex<JoinSet<()>>,
+    update: RwLock<UpdateApp>,
 }
 
 #[derive(Clone)]
@@ -73,6 +74,7 @@ impl Context {
             background_tasks: Mutex::new(background_tasks),
             persist: Database::new().await?,
             interval: Default::default(),
+            update: RwLock::new(UpdateApp::new()),
         }));
 
         Ok(rtn)
@@ -80,24 +82,8 @@ impl Context {
 
     #[deprecated]
     pub async fn add_app(&self, mut app: impl App + 'static) -> Result<()> {
-        let span = info_span!("应用", name = format!("{}", app));
-        let _span = span.enter();
-
         warn!("初始化(ignite)");
         app.ignite(self.clone()).in_current_span().await?;
-        Ok(())
-    }
-
-    #[deprecated]
-    pub async fn add_updater(&self, updater: impl Updater + 'static) -> Result<()> {
-        let span = info_span!("更新处理器", updater = format!("{}", updater));
-
-        let recv = self.update_sender.subscribe();
-        let runtime = UpdateRuntime::new(recv, self.clone(), Box::new(updater));
-
-        self.add_background_task(span, runtime.run())
-            .in_current_span()
-            .await;
         Ok(())
     }
 
@@ -125,24 +111,14 @@ impl Context {
             .spawn(async move { value.run(ctx).await.into_log() });
     }
 
-    pub async fn enable_update(&self) -> Result<()> {
-        let client = self.client.clone();
-        let sender = self.update_sender.clone();
+    pub async fn add_update_parser(&self, value: impl Updater) -> () {
+        let mut update = self.update.write().await;
+        update.add_parser(value);
+    }
 
-        self.add_background_task(info_span!("监听更新"), async move {
-            loop {
-                let update = client.next_update().await.unwrap_or_warn();
-
-                if update.is_none() {
-                    continue;
-                }
-
-                debug!("发送");
-                sender.send(update.expect("已处理"))?;
-            }
-        })
-        .await;
-        Ok(())
+    pub async fn start_update_parser(&self) -> () {
+        let updater = self.update.write().await.clone();
+        self.add_runable(updater).await;
     }
 
     pub async fn fetch_all_chat_history(&self, limit: usize) -> Result<()> {

@@ -1,15 +1,14 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use grammers_client::types::{Dialog, Message as RawMessage};
 use tracing::info;
 
 use crate::{
-    app::App,
     context::Context,
-    types::{chat, message, MessageExt, Source},
+    types::{chat, message, MessageExt, Source}, update::Updater,
 };
 
-use super::update::Updater;
-
+#[derive(Debug, Default)]
 pub struct GrayMirror;
 impl GrayMirror {
     const NAME: &str = "灰镜";
@@ -18,16 +17,11 @@ impl GrayMirror {
     }
 }
 
-impl App for GrayMirror {
-    async fn ignite(&mut self, context: crate::context::Context) -> anyhow::Result<()> {
-        // fetch_all_joined_group(context.clone()).await?;
-        context.add_updater(GrayMirror::new()).await?;
-        Ok(())
-    }
-}
-
 #[async_trait]
 impl Updater for GrayMirror {
+    fn name(&self) -> &'static str {
+        "全量镜像"
+    }
     async fn message_recv(&mut self, context: Context, msg: MessageExt) -> Result<()> {
         let source = Source::from_chat(msg.inner.chat().id());
         info!(source_id = source.id, "接收更新");

@@ -6,12 +6,12 @@ use tokio::{
     task::JoinSet,
 };
 
-use crate::{context::Context, types::MessageExt, PrintError, Runable};
+use crate::{context::Context, types::MessageExt, App, PrintError, Runable};
 
 /// 匹配器，以供部分实现
 #[async_trait]
 pub trait Updater: Send + Sync {
-    async fn name(&self) -> &'static str;
+    fn name(&self) -> &'static str;
 
     /// Occurs whenever a new text message or a message with media is produced.
     async fn message_recv(&mut self, _context: Context, _msg: MessageExt) -> Result<()> {
@@ -96,6 +96,7 @@ pub trait Updater: Send + Sync {
     // fn filter_text(&self)
 }
 
+#[derive(Debug, Clone)]
 pub struct UpdateApp {
     parser: Vec<UpdateParser>,
     tx: broadcast::Sender<Update>,
@@ -113,11 +114,17 @@ impl UpdateApp {
         self.parser.push(rt);
     }
 }
+impl Default for UpdateApp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+#[async_trait]
 impl Runable for UpdateApp {
     fn name(&self) -> &'static str {
         "更新"
     }
-    async fn run(self, ctx: Context) -> Result<()> {
+    async fn run(&mut self, ctx: Context) -> Result<()> {
         let mut tasks = JoinSet::new();
         for i in self.parser {
             tasks.spawn(i.run(ctx.clone()));
@@ -129,6 +136,13 @@ impl Runable for UpdateApp {
         Ok(())
     }
 }
+impl App for UpdateApp {
+    async fn ignite(&mut self, ctx: Context) -> Result<()> {
+        ctx.add_runable(self.clone()).await;
+        Ok(())
+    }
+}
+
 pub struct UpdateParser {
     inner: Box<dyn Updater>,
     rx: broadcast::Receiver<Update>,
@@ -141,12 +155,13 @@ impl UpdateParser {
         }
     }
 }
+#[async_trait]
 impl Runable for UpdateParser {
     fn name(&self) -> &'static str {
         self.inner.name()
     }
 
-    async fn run(mut self, ctx: Context) -> Result<()> {
+    async fn run(&mut self, ctx: Context) -> Result<()> {
         while let Ok(update) = self.rx.recv().await {
             self.inner.parse_update(ctx.clone(), update).await;
         }
@@ -162,12 +177,13 @@ impl UpdateListener {
         Self { tx: update_sender }
     }
 }
+#[async_trait]
 impl Runable for UpdateListener {
     fn name(&self) -> &'static str {
         "更新监听器"
     }
 
-    async fn run(self, ctx: Context) -> Result<()> {
+    async fn run(&mut self, ctx: Context) -> Result<()> {
         while let Ok(update) = ctx.client.next_update().await {
             self.tx.send(update)?;
         }

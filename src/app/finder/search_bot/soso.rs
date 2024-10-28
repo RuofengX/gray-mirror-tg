@@ -1,9 +1,7 @@
-use std::{fmt::Display, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::{
-    app::Updater,
-    context::Context,
-    types::{message, MessageExt, Source},
+    context::Context, types::{message, MessageExt, Source}, update::Updater
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -12,6 +10,7 @@ use tracing::info_span;
 
 use super::engine::Engine;
 
+// TODO: 把scraper逻辑放入engine结构中
 #[derive(Debug)]
 pub struct SosoScraper {
     //TODO: 改为通用型搜索，
@@ -24,7 +23,6 @@ pub struct SosoScraper {
 impl SosoScraper {
     pub const ENGINE: Engine = Engine::SOSO;
     pub fn new(
-        _context: Context,
         keyword: &'static str,
         source: Source,
         last_update: Arc<Mutex<Instant>>,
@@ -38,15 +36,11 @@ impl SosoScraper {
     }
 }
 
-impl Display for SosoScraper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{}_{}", self.engine.name, self.keyword))?;
-        Ok(())
-    }
-}
-
 #[async_trait]
 impl Updater for SosoScraper {
+    fn name(&self) -> &'static str{
+        "SOSO"
+    }
     async fn message_recv(&mut self, context: Context, msg: MessageExt) -> Result<()> {
         let new_span = info_span!("处理新消息");
         let _span = new_span.enter();

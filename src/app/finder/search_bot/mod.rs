@@ -1,22 +1,19 @@
-use std::{
-    fmt::{Display, Formatter},
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     context::Context,
     types::{search, Source},
+    Runable,
 };
 
 use anyhow::Result;
+use async_trait::async_trait;
 use engine::Engine;
 use sea_orm::Set;
 use soso::SosoScraper;
 use tokio::sync::Mutex;
-use tracing::info_span;
 
-use crate::app::{App, Updater};
+use crate::app::App;
 
 pub mod engine;
 pub mod soso;
@@ -38,15 +35,18 @@ pub struct Search {
     engine: Engine,
 }
 
-impl Display for Search {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        f.write_str("关键词搜索")?;
+#[async_trait]
+impl Runable for Search {
+    fn name(&self) -> &'static str {
+        "关键词搜索"
+    }
+    async fn run(&mut self, ctx: Context) -> Result<()> {
         Ok(())
     }
 }
 
 impl App for Search {
-    async fn ignite(&mut self, context: Context) -> Result<()> {
+    async fn ignite(&mut self, ctx: Context) -> Result<()> {
         for key in KEYWORDS {
             // 新建搜索
             let search = search::ActiveModel {
@@ -55,38 +55,23 @@ impl App for Search {
                 keyword: Set(key.to_string()),
                 ..Default::default()
             };
-            let search = context.persist.put_search(search).await?;
+            let search = ctx.persist.put_search(search).await?;
             let source = Source::from_search(&search);
 
             // 时间同步量
             let time_sync = Arc::new(Mutex::new(tokio::time::Instant::now()));
-
             // 启动WD
             let watchdog = watchdog::Watchdog::new(self.engine, key, time_sync.clone());
-            context
-                .add_background_task(
-                    info_span!("看门狗"),
-                    watchdog.background_task(context.clone()),
-                )
-                .await;
+            ctx.add_runable(watchdog).await;
 
-            // 启动更新器
-            context
-                .add_updater(SosoScraper::new(
-                    context.clone(),
-                    key,
-                    source,
-                    time_sync.clone(),
-                ))
-                .await?;
+            // 启动更新处理器
+            ctx.add_update_parser(SosoScraper::new(&key, source, time_sync)).await;
 
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(15)).await;
         }
         Ok(())
     }
 }
-
-impl Updater for Search {}
 
 impl Search {
     pub fn new(engine: Engine) -> Self {

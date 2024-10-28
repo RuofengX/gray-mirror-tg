@@ -23,11 +23,6 @@ pub mod convert;
 
 pub struct AddChat {}
 
-impl Display for AddChat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Self::NAME.fmt(f)
-    }
-}
 impl App for AddChat {
     async fn ignite(&mut self, context: Context) -> Result<()> {
         let (s, r) = tokio::sync::mpsc::channel(64);

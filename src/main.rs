@@ -1,15 +1,15 @@
 use anyhow::Result;
 use context::Context;
 use tokio;
-use tracing::{error, info, warn};
-
-pub mod login;
-
 pub mod app;
 pub mod context;
+pub mod error;
+pub mod login;
 pub mod persist;
 pub mod types;
-pub mod service;
+pub mod interface;
+
+pub use error::PrintError;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {
@@ -27,36 +27,4 @@ async fn main() -> Result<()> {
     ctx.run().await?;
 
     Ok(())
-}
-
-pub trait PrintError<T, E> {
-    fn unwrap_or_warn(self) -> Option<T>;
-    fn unwrap_or_log(self) -> Option<T>;
-    fn into_log(self) -> ();
-}
-impl<T: std::fmt::Debug, E: std::fmt::Display> PrintError<T, E> for Result<T, E> {
-    fn unwrap_or_warn(self) -> Option<T> {
-        match self {
-            Ok(t) => Some(t),
-            Err(e) => {
-                warn!("{}", e);
-                None
-            }
-        }
-    }
-    fn unwrap_or_log(self) -> Option<T> {
-        match self {
-            Ok(t) => Some(t),
-            Err(e) => {
-                error!("{}", e);
-                None
-            }
-        }
-    }
-    fn into_log(self) -> () {
-        match self {
-            Ok(t) => info!("{:?}", t),
-            Err(e) => warn!("{}", e),
-        }
-    }
 }

@@ -6,7 +6,7 @@ use tokio::{
     task::JoinSet,
 };
 
-use crate::{context::Context, types::MessageExt, PrintError};
+use crate::{context::Context, types::MessageExt, PrintError, Runable};
 
 /// 匹配器，以供部分实现
 #[async_trait]

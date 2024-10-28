@@ -81,12 +81,10 @@ impl Runable for UpdateMirror {
         let limit = self.limit;
         let mut rx = ctx.channel.fetch_history.subscribe();
 
-        while let Ok(packed_chat) = rx.recv().await {
-            ctx.add_runable(Mirror::new(packed_chat, limit))
-                .await;
+        loop {
+            let packed_chat = rx.recv().await?;
+            ctx.add_runable(Mirror::new(packed_chat, limit)).await;
         }
-
-        Ok(())
     }
 }
 
@@ -117,8 +115,7 @@ impl App for FullMirror {
                 .map(|m| m.unwrap())
                 .into_iter()
             {
-                ctx.add_runable(Mirror::new(packed_chat, self.limit))
-                    .await;
+                ctx.add_runable(Mirror::new(packed_chat, self.limit)).await;
             }
         }
         Some(())

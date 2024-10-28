@@ -85,10 +85,14 @@ impl Context {
 
     pub async fn add_runable(&self, mut value: impl Runable) -> () {
         let ctx = self.clone();
+        let name = value.name();
         self.background_tasks
             .lock()
             .await
-            .spawn(async move { value.run(ctx).await.into_log() });
+            .spawn(async move { 
+                value.run(ctx).await.into_log();
+                warn!(name, "任务退出");
+            });
     }
 
     pub async fn add_parser(&self, value: impl Updater) -> () {
@@ -139,7 +143,7 @@ pub struct IntervalSet {
 impl Default for IntervalSet {
     fn default() -> Self {
         Self {
-            join_chat: Interval::from_secs(300),
+            join_chat: Interval::from_secs(180),
             bot_resend: Interval::from_secs(15),
             resolve_username: Interval::from_secs(10),
             unpack_chat: Interval::from_millis(500),

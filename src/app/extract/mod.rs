@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::Chat;
-use sea_orm::{EntityTrait, PaginatorTrait};
+use sea_orm::{EntityTrait, PaginatorTrait, QueryOrder};
 use tracing::{info, warn};
 
 use crate::Runable;
@@ -28,16 +28,20 @@ impl Runable for ScanLink {
         loop {
             // 从数据库获取一批链接
             warn!("开始扫描全部链接");
-            let mut pages = link::Entity::find().paginate(db, 60);
+            let mut pages = link::Entity::find()
+                .order_by_desc(link::Column::Id)
+                .paginate(db, 60);
+            let mut count = 0;
             while let Some(links) = pages.fetch_and_next().await? {
                 // 将链接尝试转换为 (群组名-消息id) 结构
                 let msg_link_vec: Vec<LinkParse> = links
                     .into_iter()
                     .map(|link| LinkParse::try_from(link))
                     .filter_map(|x| {
+                        count += 1;
                         if let Err(e) = &x {
                             // 忽略转换错误
-                            warn!("链接转换失败 > {}", e);
+                            warn!(count, "链接转换失败 > {}", e);
                         }
                         x.ok()
                     })
@@ -64,15 +68,16 @@ impl Runable for ScanLink {
                         }
                     };
                     if let Some(chat) = chat {
-                        // 加入chat
-                        ctx.interval.join_chat.tick().await;
-                        ctx.client.join_chat(&chat).await?;
+                        let username = chat.username();
+                        info!(username, "成功解析链接并加入");
                         // 保存chat
                         ctx.persist
                             .put_chat(chat::ActiveModel::from_chat(&chat, source))
                             .await?;
                         // 告诉后台进程获取历史
                         ctx.channel.fetch_history.send(chat.pack())?;
+                    } else {
+                        info!("未能解析链接");
                     }
                 }
             }
@@ -103,10 +108,18 @@ impl ScanLink {
             warn!(chat_name, "新采集群组名");
             // 限制resolve频率
             ctx.interval.resolve_username.tick().await;
-            let chat = ctx.client.resolve_username(chat_name).await;
-
-            chat.unwrap_or_warn().flatten()
+            ctx.client
+                .resolve_username(chat_name)
+                .await
+                .unwrap_or_warn()
+                .flatten()
         };
+
+        if let Some(chat) = &chat {
+            // 加入chat
+            ctx.interval.join_chat.tick().await;
+            ctx.client.join_chat(chat).await?;
+        }
 
         Ok(chat)
     }
@@ -114,9 +127,8 @@ impl ScanLink {
     async fn parse_invite(invite: Invite, ctx: Context) -> Result<Option<Chat>> {
         let link = invite.invite_link.as_str();
 
-        // 限制加入聊天频率
+        // 加入chat
         ctx.interval.join_chat.tick().await;
-        // 取回chat实例
         let chats = match ctx.client.accept_invite_link(link).await? {
             tl::enums::Updates::Combined(updates) => Some(updates.chats),
             tl::enums::Updates::Updates(updates) => Some(updates.chats),
@@ -132,11 +144,13 @@ impl ScanLink {
         };
 
         if let Some(chat) = chat {
+            warn!(link, "加入邀请链接");
             ctx.persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, invite.source))
                 .await?;
             Ok(Some(chat))
         } else {
+            info!(link, "未能加入邀请链接");
             Ok(None)
         }
     }
@@ -154,7 +168,6 @@ impl ScanLink {
 
         if let Some(chat) = ctx.client.resolve_username(&may_channel.username).await? {
             warn!(chat_name = chat_username, "新采集群组名");
-
             ctx.persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, may_channel.source))
                 .await?;

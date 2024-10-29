@@ -42,7 +42,7 @@ impl Runable for Watchdog {
     }
     async fn run(&mut self, ctx: Context) -> Result<()> {
         self.bot_resend_tick.lock().await.tick().await;
-        warn!("发送初始消息");
+        warn!(engine=self.engine.name, keyword=self.keyword, "发送初始消息");
         ctx.client
             .send_message(self.engine.chat, self.keyword)
             .await?;

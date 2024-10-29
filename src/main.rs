@@ -26,15 +26,26 @@ async fn main() -> Result<()> {
 
     let ctx = Context::new().await?;
 
-    ctx.add_runable(app::UpdateMirror::new(10_0000)).await;
+    // 后台应用，被动收集聊天记录10万条
+    ctx.add_runable(app::PassiveHistory::new(10_0000)).await;
+
+    // 主动获取历史100条，防止错过
+    ctx.add_app(app::FullHistory::new(100)).await;
+
+    // 主动扫描数据库链接
     ctx.add_runable(app::ScanLink::new()).await;
+
+    // 主动搜索
     ctx.add_app(app::SearchLink::new(
         GenericEngine::JISOU,
         KEYWORDS.into_iter(),
     ))
     .await;
+
+    // 实时镜像更新
     ctx.add_parser(app::LiveMirror::default()).await;
 
+    // 启动所有更新
     ctx.start_update_parser().await;
     ctx.run().await?;
 

@@ -11,17 +11,17 @@ use crate::{
     message, App, Context, PrintError, Runable, Source,
 };
 
-pub struct Mirror {
+pub struct History {
     packed_chat: PackedChat,
     limit: usize,
 }
-impl Mirror {
+impl History {
     pub fn new(packed_chat: PackedChat, limit: usize) -> Self {
         Self { packed_chat, limit }
     }
 }
 #[async_trait]
-impl Runable for Mirror {
+impl Runable for History {
     fn name(&self) -> &'static str {
         "历史消息镜像"
     }
@@ -63,17 +63,17 @@ impl Runable for Mirror {
     }
 }
 
-pub struct UpdateMirror {
+pub struct PassiveHistory {
     limit: usize,
 }
-impl UpdateMirror {
+impl PassiveHistory {
     pub fn new(limit: usize) -> Self {
-        UpdateMirror { limit }
+        PassiveHistory { limit }
     }
 }
 
 #[async_trait]
-impl Runable for UpdateMirror {
+impl Runable for PassiveHistory {
     fn name(&self) -> &'static str {
         "增量历史消息镜像"
     }
@@ -83,21 +83,21 @@ impl Runable for UpdateMirror {
 
         loop {
             let packed_chat = rx.recv().await?;
-            ctx.add_runable(Mirror::new(packed_chat, limit)).await;
+            ctx.add_runable(History::new(packed_chat, limit)).await;
         }
     }
 }
 
-pub struct FullMirror {
+pub struct FullHistory {
     limit: usize,
 }
-impl FullMirror {
+impl FullHistory {
     pub fn new(limit: usize) -> Self {
-        FullMirror { limit }
+        FullHistory { limit }
     }
 }
 
-impl App for FullMirror {
+impl App for FullHistory {
     fn name(&self) -> &'static str {
         "全量历史消息镜像"
     }
@@ -115,7 +115,7 @@ impl App for FullMirror {
                 .map(|m| m.unwrap())
                 .into_iter()
             {
-                ctx.add_runable(Mirror::new(packed_chat, self.limit)).await;
+                ctx.add_runable(History::new(packed_chat, self.limit)).await;
             }
         }
         Some(())

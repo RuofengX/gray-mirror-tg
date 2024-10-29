@@ -109,7 +109,7 @@ impl Database {
         } else {
             let rtn = link::Entity::insert(data)
                 .on_conflict(
-                    OnConflict::column(chat::Column::ChatId)
+                    OnConflict::column(link::Column::Link)
                         .do_nothing()
                         .to_owned(),
                 )

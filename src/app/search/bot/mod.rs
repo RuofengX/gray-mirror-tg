@@ -15,7 +15,7 @@ pub mod engine;
 pub mod watchdog;
 
 pub const BOT_RESP_TIMEOUT: Duration = std::time::Duration::from_secs(60);
-pub const BOT_RESEND_INTERVAL: Duration = std::time::Duration::from_secs(10);
+pub const BOT_RESEND_INTERVAL: Duration = std::time::Duration::from_secs(60);
 
 #[derive(Debug)]
 pub struct SearchLink {

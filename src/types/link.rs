@@ -11,6 +11,7 @@ pub struct Model {
     pub id: i32,
     pub link: String,
     pub desc: String,
+    pub parsed: bool,
     pub source: SourceType,
     pub source_id: i64,
 }
@@ -44,6 +45,7 @@ impl Link {
             id: NotSet,
             link: Set(self.link),
             desc: Set(self.desc),
+            parsed: Set(false),
             source: Set(source.ty),
             source_id: Set(source.id),
         }

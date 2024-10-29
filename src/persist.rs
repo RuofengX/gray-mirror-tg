@@ -1,8 +1,8 @@
 use anyhow::Result;
 use dotenv_codegen::dotenv;
 use sea_orm::{
-    prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, Schema, Statement,
-    TransactionTrait,
+    prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, IntoActiveModel, Schema, Set,
+    Statement, TransactionTrait,
 };
 use tracing::debug;
 
@@ -125,5 +125,17 @@ impl Database {
             .await?;
 
         Ok(rtn)
+    }
+
+    pub async fn set_link_extracted(&self, link_id: i32) -> Result<Option<link::Model>> {
+        let exist = link::Entity::find_by_id(link_id).one(&self.db).await?;
+        if let Some(exist) = exist {
+            let mut model = exist.into_active_model();
+            model.parsed = Set(true);
+            let updated = model.update(&self.db).await?;
+            Ok(Some(updated))
+        } else {
+            Ok(None)
+        }
     }
 }

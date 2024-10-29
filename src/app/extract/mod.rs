@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::Chat;
-use sea_orm::{EntityTrait, PaginatorTrait, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use tracing::{info, warn};
 
 use crate::Runable;
@@ -29,47 +29,52 @@ impl Runable for ScanLink {
             // 从数据库获取一批链接
             warn!("开始扫描全部链接");
             let mut pages = link::Entity::find()
+                .filter(link::Column::Parsed.eq(false))
                 .order_by_desc(link::Column::Id)
-                .paginate(db, 60);
+                .paginate(db, 512);
             let mut count = 0;
             while let Some(links) = pages.fetch_and_next().await? {
-                // 将链接尝试转换为 (群组名-消息id) 结构
-                let msg_link_vec: Vec<LinkParse> = links
-                    .into_iter()
-                    .map(|link| LinkParse::try_from(link))
-                    .filter_map(|x| {
-                        count += 1;
-                        if let Err(e) = &x {
-                            // 忽略转换错误
-                            warn!(count, "链接转换失败 > {}", e);
-                        }
-                        x.ok()
-                    })
-                    .collect();
+                for link_model in links {
+                    count += 1;
+                    info!(count, "处理链接");
 
-                for link_parse in msg_link_vec {
-                    let source = link_parse.source();
-                    let chat = match link_parse {
+                    // 将链接标记为已提取
+                    let model = ctx
+                        .persist
+                        .set_link_extracted(link_model.id)
+                        .await
+                        .ok()
+                        .flatten();
+                    if model.is_none() {
+                        continue;
+                    }
+                    let model = model.unwrap();
+
+                    // 将链接尝试转换为 (群组名-消息id) 结构
+                    let link = LinkParse::try_from(model).unwrap_or_warn();
+                    if link.is_none() {
+                        continue;
+                    }
+
+                    // 转换为link
+                    let link = link.unwrap();
+
+                    let source = link.source();
+
+                    let chat = match link {
                         LinkParse::ChatMessage(chat_msg) => {
-                            Self::parse_chat_msg(chat_msg, ctx.clone())
-                                .await
-                                .unwrap_or_warn()
-                                .flatten()
+                            Self::parse_chat_msg(chat_msg, ctx.clone()).await?
                         }
-                        LinkParse::Invite(invite) => Self::parse_invite(invite, ctx.clone())
-                            .await
-                            .unwrap_or_warn()
-                            .flatten(),
+                        LinkParse::Invite(invite) => {
+                            Self::parse_invite(invite, ctx.clone()).await?
+                        }
                         LinkParse::MaybeChannel(channel) => {
-                            Self::parse_channel(channel, ctx.clone())
-                                .await
-                                .unwrap_or_warn()
-                                .flatten()
+                            Self::parse_channel(channel, ctx.clone()).await?
                         }
                     };
                     if let Some(chat) = chat {
                         let username = chat.username();
-                        info!(username, "成功解析链接并加入");
+                        info!(count, username, "成功解析链接并加入");
                         // 保存chat
                         ctx.persist
                             .put_chat(chat::ActiveModel::from_chat(&chat, source))
@@ -77,11 +82,11 @@ impl Runable for ScanLink {
                         // 告诉后台进程获取历史
                         ctx.channel.fetch_history.send(chat.pack())?;
                     } else {
-                        info!("未能解析链接");
+                        info!(count, "未能解析链接");
                     }
                 }
             }
-            warn!("扫描全部链接完成");
+            warn!(count, "扫描全部链接完成");
         }
     }
 }

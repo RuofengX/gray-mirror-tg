@@ -26,13 +26,13 @@ async fn main() -> Result<()> {
 
     let ctx = Context::new().await?;
 
+    ctx.add_runable(app::UpdateMirror::new(10_0000)).await;
+    ctx.add_runable(app::ScanLink::new()).await;
     ctx.add_app(app::SearchLink::new(
         GenericEngine::JISOU,
         KEYWORDS.into_iter(),
     ))
     .await;
-    ctx.add_runable(app::UpdateMirror::new(10_0000)).await;
-    ctx.add_runable(app::ScanLink::new()).await;
     ctx.add_parser(app::LiveMirror::default()).await;
 
     ctx.start_update_parser().await;

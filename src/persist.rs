@@ -80,7 +80,7 @@ impl Database {
 
     pub async fn put_chat(&self, data: chat::ActiveModel) -> Result<chat::Model> {
         let exist = chat::Entity::find()
-            .filter(chat::Column::ChatId.eq(data.chat_id.clone().into_value().unwrap()))
+            .filter(chat::Column::ChatId.eq(data.chat_id.clone().unwrap()))
             .one(&self.db)
             .await?;
         if let Some(exist) = exist {
@@ -99,8 +99,23 @@ impl Database {
     }
 
     pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
-        let rtn = data.insert(&self.db).await?;
-        Ok(rtn)
+        let exist = link::Entity::find()
+            .filter(link::Column::Link.eq(data.link.clone().unwrap()))
+            .one(&self.db)
+            .await?;
+        if let Some(exist) = exist {
+            Ok(exist)
+        } else {
+            let rtn = link::Entity::insert(data)
+                .on_conflict(
+                    OnConflict::column(chat::Column::ChatId)
+                        .do_nothing()
+                        .to_owned(),
+                )
+                .exec_with_returning(&self.db)
+                .await?;
+            Ok(rtn)
+        }
     }
 
     pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {

@@ -18,7 +18,7 @@ pub use error::PrintError;
 pub use types::*;
 pub use update::Updater;
 
-const KEYWORDS: [&str; 5] = ["柏盛", "财神", "菩萨", "园区", "担保"];
+const KEYWORDS: [&str; 2] = ["园区", "担保"];
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {

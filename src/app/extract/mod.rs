@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::Chat;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{info, warn};
 
 use crate::Runable;
@@ -30,7 +30,7 @@ impl Runable for ScanLink {
             warn!("开始扫描全部链接");
             let links = link::Entity::find()
                 .filter(link::Column::Parsed.eq(false))
-                .order_by_desc(link::Column::Id)
+                // .order_by_desc(link::Column::Id)
                 .all(db)
                 .await?;
             let mut count = 0;
@@ -52,13 +52,20 @@ impl Runable for ScanLink {
 
                 let chat = match link {
                     LinkParse::ChatMessage(chat_msg) => {
-                        Self::parse_chat_msg(id, chat_msg, ctx.clone()).await?
+                        Self::parse_chat_msg(id, chat_msg, ctx.clone())
+                            .await
+                            .unwrap_or_log() // FIXME: 三个中的某一个会报数据库错误找不到chat_id
+                            .flatten()
                     }
-                    LinkParse::Invite(invite) => {
-                        Self::parse_invite(id, invite, ctx.clone()).await?
-                    }
+                    LinkParse::Invite(invite) => Self::parse_invite(id, invite, ctx.clone())
+                        .await
+                        .unwrap_or_log()
+                        .flatten(),
                     LinkParse::MaybeChannel(channel) => {
-                        Self::parse_channel(id, channel, ctx.clone()).await?
+                        Self::parse_channel(id, channel, ctx.clone())
+                            .await
+                            .unwrap_or_log()
+                            .flatten()
                     }
                 };
                 if let Some(chat) = chat {

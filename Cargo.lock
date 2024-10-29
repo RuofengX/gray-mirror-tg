@@ -901,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "gray-mirror-tg"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -12,9 +12,10 @@ pub struct Model {
     #[sea_orm(unique)]
     pub link: String,
     pub desc: String,
-    pub parsed: bool,
     pub source: SourceType,
     pub source_id: i64,
+    pub parsed: bool,
+    pub packed: Option<String>,
 }
 // TODO: 加一个check_at字段，超过一段时间就再检查一遍
 
@@ -46,9 +47,10 @@ impl Link {
             id: NotSet,
             link: Set(self.link),
             desc: Set(self.desc),
-            parsed: Set(false),
             source: Set(source.ty),
             source_id: Set(source.id),
+            parsed: Set(false),
+            packed: Set(None),
         }
     }
 }

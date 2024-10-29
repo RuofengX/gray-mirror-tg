@@ -2,7 +2,7 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use grammers_client::Client;
+use grammers_client::{types::{Chat, PackedChat}, Client};
 use tokio::{
     sync::{Mutex, RwLock},
     task::JoinSet,
@@ -86,13 +86,10 @@ impl Context {
     pub async fn add_runable(&self, mut value: impl Runable) -> () {
         let ctx = self.clone();
         let name = value.name();
-        self.background_tasks
-            .lock()
-            .await
-            .spawn(async move { 
-                value.run(ctx).await.into_log();
-                warn!(name, "任务退出");
-            });
+        self.background_tasks.lock().await.spawn(async move {
+            value.run(ctx).await.into_log();
+            warn!(name, "任务退出");
+        });
     }
 
     pub async fn add_parser(&self, value: impl Updater) -> () {
@@ -115,6 +112,18 @@ impl Context {
         warn!("全部任务结束");
         Ok(())
     }
+
+    pub async fn resolve_username(&self, username: &str) -> Result<Option<Chat>> {
+        self.interval.resolve_username.tick().await;
+        let rtn = self.client.resolve_username(username).await?;
+        Ok(rtn)
+    }
+
+    pub async fn join_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<Chat>>{
+        self.interval.join_chat.tick().await;
+        let rtn = self.client.join_chat(chat).await?;
+        Ok(rtn)
+    }
 }
 
 pub struct Interval(Mutex<tokio::time::Interval>);
@@ -122,6 +131,7 @@ impl Interval {
     pub fn from_secs(freq: u64) -> Self {
         Self(Mutex::new(tokio::time::interval(Duration::from_secs(freq))))
     }
+
     pub fn from_millis(freq: u64) -> Self {
         Self(Mutex::new(tokio::time::interval(Duration::from_millis(
             freq,

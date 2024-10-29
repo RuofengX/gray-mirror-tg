@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::Chat;
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use tracing::{info, warn};
 
 use crate::Runable;
@@ -28,62 +28,50 @@ impl Runable for ScanLink {
         loop {
             // 从数据库获取一批链接
             warn!("开始扫描全部链接");
-            let mut pages = link::Entity::find()
+            let links = link::Entity::find()
                 .filter(link::Column::Parsed.eq(false))
                 .order_by_desc(link::Column::Id)
-                .paginate(db, 512);
+                .all(db)
+                .await?;
             let mut count = 0;
-            while let Some(links) = pages.fetch_and_next().await? {
-                for link_model in links {
-                    count += 1;
-                    info!(count, "处理链接");
+            for link_model in links {
+                let id = link_model.id;
+                count += 1;
+                info!(count, "处理链接");
 
-                    // 将链接标记为已提取
-                    let model = ctx
-                        .persist
-                        .set_link_extracted(link_model.id)
-                        .await
-                        .ok()
-                        .flatten();
-                    if model.is_none() {
-                        continue;
+                // 将链接尝试转换为 (群组名-消息id) 结构
+                let link = LinkParse::try_from(link_model).unwrap_or_warn();
+                if link.is_none() {
+                    continue;
+                }
+
+                // 转换为link
+                let link = link.unwrap();
+
+                let source = link.source();
+
+                let chat = match link {
+                    LinkParse::ChatMessage(chat_msg) => {
+                        Self::parse_chat_msg(id, chat_msg, ctx.clone()).await?
                     }
-                    let model = model.unwrap();
-
-                    // 将链接尝试转换为 (群组名-消息id) 结构
-                    let link = LinkParse::try_from(model).unwrap_or_warn();
-                    if link.is_none() {
-                        continue;
+                    LinkParse::Invite(invite) => {
+                        Self::parse_invite(id, invite, ctx.clone()).await?
                     }
-
-                    // 转换为link
-                    let link = link.unwrap();
-
-                    let source = link.source();
-
-                    let chat = match link {
-                        LinkParse::ChatMessage(chat_msg) => {
-                            Self::parse_chat_msg(chat_msg, ctx.clone()).await?
-                        }
-                        LinkParse::Invite(invite) => {
-                            Self::parse_invite(invite, ctx.clone()).await?
-                        }
-                        LinkParse::MaybeChannel(channel) => {
-                            Self::parse_channel(channel, ctx.clone()).await?
-                        }
-                    };
-                    if let Some(chat) = chat {
-                        let username = chat.username();
-                        info!(count, username, "成功解析链接并加入");
-                        // 保存chat
-                        ctx.persist
-                            .put_chat(chat::ActiveModel::from_chat(&chat, source))
-                            .await?;
-                        // 告诉后台进程获取历史
-                        ctx.channel.fetch_history.send(chat.pack())?;
-                    } else {
-                        info!(count, "未能解析链接");
+                    LinkParse::MaybeChannel(channel) => {
+                        Self::parse_channel(id, channel, ctx.clone()).await?
                     }
+                };
+                if let Some(chat) = chat {
+                    let username = chat.username();
+                    info!(count, username, "成功解析链接并加入");
+                    // 保存chat
+                    ctx.persist
+                        .put_chat(chat::ActiveModel::from_chat(&chat, source))
+                        .await?;
+                    // 告诉后台进程获取历史
+                    ctx.channel.fetch_history.send(chat.pack())?;
+                } else {
+                    info!(count, "未能解析链接");
                 }
             }
             warn!(count, "扫描全部链接完成");
@@ -97,7 +85,11 @@ impl ScanLink {
         Self {}
     }
 
-    async fn parse_chat_msg(chat_msg: ChatMessage, ctx: Context) -> Result<Option<Chat>> {
+    async fn parse_chat_msg(
+        link_id: i32,
+        chat_msg: ChatMessage,
+        ctx: Context,
+    ) -> Result<Option<Chat>> {
         let chat_name = chat_msg.username.as_str(); // 群组名
 
         // 判断是否已采集，避免频繁调用resolve_username
@@ -111,10 +103,7 @@ impl ScanLink {
         } else {
             // 未采集
             warn!(chat_name, "新采集群组名");
-            // 限制resolve频率
-            ctx.interval.resolve_username.tick().await;
-            ctx.client
-                .resolve_username(chat_name)
+            ctx.resolve_username(chat_name)
                 .await
                 .unwrap_or_warn()
                 .flatten()
@@ -122,14 +111,20 @@ impl ScanLink {
 
         if let Some(chat) = &chat {
             // 加入chat
-            ctx.interval.join_chat.tick().await;
-            ctx.client.join_chat(chat).await?;
+            ctx.join_chat(chat).await?;
+            // 将链接标记为已提取
+            ctx.persist
+                .set_link_extracted(link_id, Some(chat.pack()))
+                .await?;
+        } else {
+            // 将链接标记为已提取
+            ctx.persist.set_link_extracted(link_id, None).await?;
         }
 
         Ok(chat)
     }
 
-    async fn parse_invite(invite: Invite, ctx: Context) -> Result<Option<Chat>> {
+    async fn parse_invite(link_id: i32, invite: Invite, ctx: Context) -> Result<Option<Chat>> {
         let link = invite.invite_link.as_str();
 
         // 加入chat
@@ -150,35 +145,51 @@ impl ScanLink {
 
         if let Some(chat) = chat {
             warn!(link, "加入邀请链接");
+            // 将链接标记为已提取
+            ctx.persist
+                .set_link_extracted(link_id, Some(chat.pack()))
+                .await?;
             ctx.persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, invite.source))
                 .await?;
             Ok(Some(chat))
         } else {
             info!(link, "未能加入邀请链接");
+            // 将链接标记为已提取，无pack
+            ctx.persist.set_link_extracted(link_id, None).await?;
             Ok(None)
         }
     }
 
-    async fn parse_channel(may_channel: MaybeChannel, ctx: Context) -> Result<Option<Chat>> {
+    async fn parse_channel(
+        link_id: i32,
+        may_channel: MaybeChannel,
+        ctx: Context,
+    ) -> Result<Option<Chat>> {
         let chat_username = may_channel.username.as_str();
 
         if ctx.persist.find_chat(Some(chat_username)).await?.is_some() {
             // 已采集
             info!(chat_name = chat_username, "已采集过群组名");
+            // 将链接标记为已提取，无pack
+            ctx.persist.set_link_extracted(link_id, None).await?;
             return Ok(None);
         }
 
-        ctx.interval.resolve_username.tick().await;
-
-        if let Some(chat) = ctx.client.resolve_username(&may_channel.username).await? {
+        if let Some(chat) = ctx.resolve_username(&may_channel.username).await? {
             warn!(chat_name = chat_username, "新采集群组名");
             ctx.persist
                 .put_chat(chat::ActiveModel::from_chat(&chat, may_channel.source))
                 .await?;
+            // 将链接标记为已提取，无pack
+            ctx.persist
+                .set_link_extracted(link_id, Some(chat.pack()))
+                .await?;
             Ok(Some(chat))
         } else {
             info!(chat_name = chat_username, "未找到群组名");
+            // 将链接标记为已提取，无pack
+            ctx.persist.set_link_extracted(link_id, None).await?;
             Ok(None)
         }
     }

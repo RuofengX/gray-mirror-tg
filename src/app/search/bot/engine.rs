@@ -34,8 +34,7 @@ impl GenericEngine {
     };
 
     pub async fn new(username: &'static str, ctx: Context) -> Result<Option<Self>> {
-        ctx.interval.resolve_username.tick().await;
-        if let Some(chat) = ctx.client.resolve_username(username).await? {
+        if let Some(chat) = ctx.resolve_username(username).await? {
             Ok(Some(Self {
                 name: username,
                 chat: chat.pack(),

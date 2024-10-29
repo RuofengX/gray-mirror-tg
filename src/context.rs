@@ -138,16 +138,14 @@ pub struct IntervalSet {
     pub unpack_chat: Interval,
     pub resolve_username: Interval,
     pub find_msg: Interval,
-    pub bot_resend: Interval,
 }
 impl Default for IntervalSet {
     fn default() -> Self {
         Self {
             join_chat: Interval::from_secs(300),
-            bot_resend: Interval::from_secs(15),
             resolve_username: Interval::from_secs(10),
             unpack_chat: Interval::from_millis(500),
-            find_msg: Interval::from_millis(20),
+            find_msg: Interval::from_millis(15),
         }
     }
 }

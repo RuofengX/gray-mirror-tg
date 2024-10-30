@@ -2,7 +2,10 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use dotenv_codegen::dotenv;
-use grammers_client::{types::{Chat, PackedChat}, Client};
+use grammers_client::{
+    types::{Chat, PackedChat},
+    Client, InvocationError,
+};
 use tokio::{
     sync::{Mutex, RwLock},
     task::JoinSet,
@@ -115,13 +118,34 @@ impl Context {
 
     pub async fn resolve_username(&self, username: &str) -> Result<Option<Chat>> {
         self.interval.resolve_username.tick().await;
-        let rtn = self.client.resolve_username(username).await?;
+        let mut rtn = self.client.resolve_username(username).await;
+        if let Err(e) = rtn {
+            wait_on_flood(e).await;
+            warn!("重新尝试");
+            self.interval.resolve_username.tick().await;
+            rtn = self.client.resolve_username(username).await;
+        }
+        let rtn = rtn.unwrap_or_log().flatten();
         Ok(rtn)
     }
 
-    pub async fn join_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<Chat>>{
+    pub async fn join_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<Chat>> {
         self.interval.join_chat.tick().await;
-        let rtn = self.client.join_chat(chat).await?;
+        let chat = Into::<PackedChat>::into(chat);
+        let id = chat.id;
+        let mut rtn = self.client.join_chat(chat).await;
+        if let Err(e) = rtn {
+            wait_on_flood(e).await;
+            warn!("重新尝试");
+            self.interval.join_chat.tick().await;
+            rtn = self.client.join_chat(chat).await;
+        }
+        let rtn = rtn.unwrap_or_log().flatten();
+        if let Some(rtn) = &rtn {
+            warn!(chat_name = rtn.name(), chat_id = rtn.id(), "加入聊天");
+        } else {
+            error!(chat_id = id, "加入聊天失败");
+        }
         Ok(rtn)
     }
 }
@@ -158,4 +182,22 @@ impl Default for IntervalSet {
             find_msg: Interval::from_millis(15),
         }
     }
+}
+
+async fn wait_on_flood(e: InvocationError) -> Option<()> {
+    match e {
+        InvocationError::Rpc(e) => {
+            if e.code == 420 {
+                warn!("服务器警告FLOOD_WAIT");
+                if let Some(cooldown) = e.value {
+                    warn!(cooldown, "尝试休眠");
+                    tokio::time::sleep(Duration::from_secs(cooldown as u64)).await;
+                    warn!(cooldown, "结束休眠");
+                    return Some(());
+                }
+            }
+        }
+        _ => (),
+    };
+    return None;
 }

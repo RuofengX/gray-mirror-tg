@@ -54,7 +54,7 @@ impl Runable for ScanLink {
                     LinkParse::ChatMessage(chat_msg) => {
                         Self::parse_chat_msg(id, chat_msg, ctx.clone())
                             .await
-                            .unwrap_or_log() // FIXME: 三个中的某一个会报数据库错误找不到chat_id
+                            .unwrap_or_log()
                             .flatten()
                     }
                     LinkParse::Invite(invite) => Self::parse_invite(id, invite, ctx.clone())
@@ -136,7 +136,16 @@ impl ScanLink {
 
         // 加入chat
         ctx.interval.join_chat.tick().await;
-        let chats = match ctx.client.accept_invite_link(link).await? {
+        let updates = ctx.client.accept_invite_link(link).await.unwrap_or_log();
+        if updates.is_none() {
+            warn!(link, "未能加入邀请链接");
+            // 将链接标记为已提取，无pack
+            ctx.persist.set_link_extracted(link_id, None).await?;
+            return Ok(None);
+        }
+        let updates = updates.unwrap();
+
+        let chats = match updates {
             tl::enums::Updates::Combined(updates) => Some(updates.chats),
             tl::enums::Updates::Updates(updates) => Some(updates.chats),
             _ => None,
@@ -161,7 +170,7 @@ impl ScanLink {
                 .await?;
             Ok(Some(chat))
         } else {
-            info!(link, "未能加入邀请链接");
+            warn!(link, "未能加入邀请链接");
             // 将链接标记为已提取，无pack
             ctx.persist.set_link_extracted(link_id, None).await?;
             Ok(None)

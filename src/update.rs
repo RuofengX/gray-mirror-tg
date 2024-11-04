@@ -5,6 +5,7 @@ use tokio::{
     sync::broadcast::{self, Receiver},
     task::JoinSet,
 };
+use tracing::warn;
 
 use crate::{context::Context, types::MessageExt, PrintError, Runable};
 
@@ -124,17 +125,22 @@ impl Runable for UpdateApp {
         "更新"
     }
     async fn run(&mut self, ctx: Context) -> Result<()> {
-        let mut tasks = JoinSet::new();
-        while let Some(mut i) = self.parser.pop() {
+        let mut count = 0;
+        loop {
+            let mut tasks = JoinSet::new();
+            while let Some(mut i) = self.parser.pop() {
+                let ctxx = ctx.clone();
+                tasks.spawn(async move { i.run(ctxx).await });
+            }
+            let mut listener = UpdateListener::new(self.tx.clone());
             let ctxx = ctx.clone();
-            tasks.spawn(async move { i.run(ctxx).await });
+            tasks.spawn(async move { listener.run(ctxx).await });
+            while let Some(task) = tasks.join_next().await {
+                task?.into_log();
+            }
+            count += 1;
+            warn!(count, "Update守护进程过早退出，自动重启")
         }
-        let mut listener = UpdateListener::new(self.tx.clone());
-        tasks.spawn(async move { listener.run(ctx).await });
-        while let Some(task) = tasks.join_next().await {
-            task?.into_log();
-        }
-        Ok(())
     }
 }
 

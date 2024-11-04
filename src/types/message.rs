@@ -116,7 +116,6 @@ pub struct Model {
     pub chat_id: i64,
     #[sea_orm(primary_key)]
     pub msg_id: i32,
-    pub message: String,
     pub raw: Json,
     pub source: SourceType,
     pub source_id: i64,
@@ -134,7 +133,6 @@ impl ActiveModel {
         Self {
             chat_id: Set(msg.chat().id()),
             msg_id: Set(msg.id()),
-            message: Set(msg.raw.message.clone()),
             raw,
             source: Set(source.ty),
             source_id: Set(source.id),

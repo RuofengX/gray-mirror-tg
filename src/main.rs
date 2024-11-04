@@ -37,7 +37,8 @@ async fn main() -> Result<()> {
 
     // 主动搜索
     ctx.add_app(app::SearchLink::new(
-        GenericEngine::JISOU,
+        // GenericEngine::JISOU,
+        GenericEngine::SOSO,
         KEYWORDS.into_iter(),
     ))
     .await;

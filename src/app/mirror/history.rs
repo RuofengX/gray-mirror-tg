@@ -63,31 +63,6 @@ impl Runable for History {
     }
 }
 
-pub struct PassiveHistory {
-    limit: usize,
-}
-impl PassiveHistory {
-    pub fn new(limit: usize) -> Self {
-        PassiveHistory { limit }
-    }
-}
-
-#[async_trait]
-impl Runable for PassiveHistory {
-    fn name(&self) -> &'static str {
-        "增量历史消息镜像"
-    }
-    async fn run(&mut self, ctx: Context) -> Result<()> {
-        let limit = self.limit;
-        let mut rx = ctx.channel.fetch_history.subscribe();
-
-        loop {
-            let packed_chat = rx.recv().await?;
-            ctx.add_runable(History::new(packed_chat, limit)).await;
-        }
-    }
-}
-
 pub struct FullHistory {
     limit: usize,
 }

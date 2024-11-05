@@ -3,7 +3,6 @@ use app::search::engine::GenericEngine;
 
 pub mod abstruct;
 pub mod app;
-pub mod channel;
 pub mod context;
 pub mod error;
 pub mod login;
@@ -25,9 +24,6 @@ async fn main() -> Result<()> {
     println!("你好世界!");
 
     let ctx = Context::new().await?;
-
-    // 后台应用，被动收集聊天记录10万条
-    ctx.add_runable(app::PassiveHistory::new(10_0000)).await;
 
     // 主动获取历史100条，防止错过
     // ctx.add_app(app::FullHistory::new(100)).await;

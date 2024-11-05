@@ -15,7 +15,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 use crate::{
-    channel::Channel,
     persist::Database,
     update::{UpdateApp, Updater},
     App, PrintError, Runable,
@@ -28,7 +27,6 @@ pub struct ContextInner {
     pub client: Client,
     pub persist: Database,
     pub interval: IntervalSet,
-    pub channel: Channel,
     background_tasks: Mutex<JoinSet<()>>,
     update: RwLock<UpdateApp>,
 }
@@ -72,7 +70,6 @@ impl Context {
             persist: Database::new().await?,
             update: RwLock::new(UpdateApp::new()),
             interval: Default::default(),
-            channel: Default::default(),
         }));
 
         Ok(rtn)

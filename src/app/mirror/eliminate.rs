@@ -9,7 +9,4 @@ pub struct Sentence{
 
 
 impl Sentence{
-    pub fn choice_one(&self) -> Result<Chat>{
-
-    }
 }

@@ -4,7 +4,7 @@ pub mod search;
 
 use std::future::Future;
 
-pub use mirror::{history::{History, PassiveHistory, FullHistory}, update::LiveMirror};
+pub use mirror::{history::{History, FullHistory}, update::LiveMirror};
 pub use extract::ScanLink;
 pub use search::SearchLink;
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use dotenv_codegen::dotenv;
 use grammers_client::types::PackedChat;
 use sea_orm::{
@@ -64,8 +64,13 @@ impl Database {
     }
 
     pub async fn put_message(&self, data: message::ActiveModel) -> Result<message::Model> {
-        let chat_id = data.chat_id.clone().unwrap();
-        let msg_id = data.msg_id.clone().unwrap();
+        let (chat_id, msg_id) = if let (Some(chat_id), Some(msg_id)) =
+            (data.chat_id.clone().take(), data.msg_id.clone().take())
+        {
+            (chat_id, msg_id)
+        } else {
+            bail!("put_message方法未提供chat_id与msg_id")
+        };
 
         let trans = self.db.begin().await?;
         let _ = message::Entity::insert(data)
@@ -83,8 +88,13 @@ impl Database {
     }
 
     pub async fn put_chat(&self, data: chat::ActiveModel) -> Result<chat::Model> {
+        let chat_id = if let Some(chat_id) = data.chat_id.clone().take() {
+            chat_id
+        } else {
+            bail!("put_chat未提供chat_id")
+        };
         let exist = chat::Entity::find()
-            .filter(chat::Column::ChatId.eq(data.chat_id.clone().unwrap()))
+            .filter(chat::Column::ChatId.eq(chat_id))
             .one(&self.db)
             .await?;
         if let Some(exist) = exist {
@@ -103,8 +113,13 @@ impl Database {
     }
 
     pub async fn put_link(&self, data: link::ActiveModel) -> Result<link::Model> {
+        let link = if let Some(link) = data.link.clone().take() {
+            link
+        } else {
+            bail!("put_link未提供link")
+        };
         let exist = link::Entity::find()
-            .filter(link::Column::Link.eq(data.link.clone().unwrap()))
+            .filter(link::Column::Link.eq(link))
             .one(&self.db)
             .await?;
         if let Some(exist) = exist {

@@ -129,9 +129,12 @@ impl Context {
     }
 
     pub async fn quit_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<()>> {
-        self.interval.quit_chat.tick().await;
         let chat = Into::<PackedChat>::into(chat);
         let id = chat.id;
+        warn!(chat_id = id, "退出聊天");
+
+        self.interval.quit_chat.tick().await;
+
         let mut ret = self.client.delete_dialog(chat).await;
         if wait_on_flood(&ret).await.is_some() {
             warn!("重新尝试");
@@ -141,7 +144,7 @@ impl Context {
         let ret = ret.ok_or_log();
         if ret.is_some() {
             self.persist.set_chat_quited(id).await?;
-            warn!(chat_id = id, "退出聊天");
+            warn!(chat_id = id, "退出聊天成功");
         } else {
             warn!(chat_id = id, "退出聊天失败");
         }
@@ -247,11 +250,11 @@ impl Context {
         match e {
             InvocationError::Rpc(e) => {
                 if e.code == 400 && e.name.eq("CHANNELS_TOO_MUCH") {
-                    warn!("服务器警告CHANNELS_TOO_MUCH");
-                    info!("尝试退出聊天");
+                    warn!("捕获服务器警告CHANNELS_TOO_MUCH");
+                    info!("尝试退出聊天以腾出空间");
                     let chat = self
                         .persist
-                        .find_latest_chat(None)
+                        .find_oldest_chat(Some(true))
                         .await
                         .ok_or_log()
                         .flatten()
@@ -260,7 +263,7 @@ impl Context {
                     if let Some(chat) = chat {
                         self.quit_chat(chat).await.into_log();
                     } else {
-                        warn!("尝试退出聊天时发生错误，放弃处理");
+                        warn!("尝试退出聊天以腾出空间时发生错误，放弃处理");
                         return None;
                     }
                     return Some(());
@@ -314,7 +317,7 @@ async fn wait_on_flood<T>(result: &Result<T, InvocationError>) -> Option<()> {
         InvocationError::Rpc(e) => {
             if e.code == 420 {
                 // TODO: 添加and逻辑，e.name.eq(name of FLOOD)
-                warn!("服务器警告FLOOD_WAIT");
+                warn!("捕获服务器警告FLOOD_WAIT");
                 if let Some(cooldown) = e.value {
                     warn!(cooldown, "尝试休眠");
                     tokio::time::sleep(Duration::from_secs(cooldown as u64)).await;

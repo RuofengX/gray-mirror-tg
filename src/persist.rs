@@ -7,7 +7,10 @@ use sea_orm::{
 };
 use tracing::debug;
 
-use crate::types::{chat, link, message, search};
+use crate::{
+    types::{chat, link, message, search},
+    Context,
+};
 
 pub struct Database {
     pub db: DatabaseConnection,
@@ -160,20 +163,36 @@ impl Database {
         }
     }
 
-    pub async fn find_update_candidate(&self) -> Result<Option<chat::Model>> {
+    pub async fn find_update_candidate(&self) -> Result<chat::Model> {
         let ret = chat::Entity::find()
+            .filter(chat::Column::Joined.eq(true))
             .order_by(chat::Column::LastUpdate, Order::Asc)
             .one(&self.db)
-            .await?;
+            .await?
+            .expect("数据库为空");
         Ok(ret)
     }
 
-    pub async fn find_quit_candidate(&self) -> Result<Option<chat::Model>> {
+    pub async fn find_quit_candidate(&self) -> Result<chat::Model> {
         let ret = chat::Entity::find()
+            .filter(chat::Column::Joined.eq(true))
             .order_by(chat::Column::LastUpdate, Order::Desc)
             .one(&self.db)
-            .await?;
+            .await?
+            .expect("数据库为空");
         Ok(ret)
+    }
+
+    pub async fn set_chat_joined(&self, chat_id: i64) -> Result<Option<chat::Model>> {
+        let exist = chat::Entity::find_by_id(chat_id).one(&self.db).await?;
+        if let Some(exist) = exist {
+            let mut model = exist.into_active_model();
+            model.joined = Set(true);
+            let updated = model.update(&self.db).await?;
+            Ok(Some(updated))
+        } else {
+            Ok(None)
+        }
     }
 
     pub async fn set_chat_quited(&self, chat_id: i64) -> Result<Option<chat::Model>> {
@@ -188,15 +207,38 @@ impl Database {
         }
     }
 
-    pub async fn set_chat_updated(&self, chat_id: i64, last_update: DateTime) -> Result<Option<chat::Model>> {
+    pub async fn set_chat_updated(
+        &self,
+        chat_id: i64,
+        last_update: DateTime,
+    ) -> Result<Option<chat::Model>> {
         let exist = chat::Entity::find_by_id(chat_id).one(&self.db).await?;
         if let Some(exist) = exist {
             let mut model = exist.into_active_model();
-            model.last_update= Set(last_update);
+            model.last_update = Set(last_update);
             let updated = model.update(&self.db).await?;
             Ok(Some(updated))
         } else {
             Ok(None)
         }
+    }
+
+    pub async fn sync_chat_joined(&self, ctx: Context) -> Result<()> {
+        let trans = self.db.begin().await?;
+        chat::Entity::update_many()
+            .col_expr(chat::Column::Joined, Expr::value(false))
+            .exec(&trans)
+            .await?;
+        let mut chats = ctx.client.iter_dialogs();
+        while let Some(chat) = chats.next().await? {
+            let chat_id = chat.chat.id();
+            let exist = chat::Entity::find_by_id(chat_id).one(&self.db).await?;
+            if let Some(exist) = exist {
+                let mut model = exist.into_active_model();
+                model.joined = Set(true);
+                model.update(&trans).await?;
+            }
+        }
+        Ok(())
     }
 }

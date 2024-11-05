@@ -4,12 +4,8 @@ use grammers_client::types::Chat;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{info, warn};
 
-use crate::Runable;
-use crate::{
-    context::Context,
-    types::{chat, link},
-    PrintError,
-};
+use crate::{context::Context, types::link, PrintError};
+use crate::{Runable, Source};
 
 use url_parse::{ChatMessage, Invite, LinkParse, MaybeChannel};
 
@@ -51,7 +47,7 @@ impl Runable for ScanLink {
 
                 let chat = match link {
                     LinkParse::ChatMessage(chat_msg) => {
-                        Self::parse_chat_msg(id, chat_msg, ctx.clone())
+                        Self::parse_chat_msg(id, chat_msg, ctx.clone(), source)
                             .await
                             .ok_or_log()
                             .flatten()
@@ -70,10 +66,6 @@ impl Runable for ScanLink {
                 if let Some(chat) = chat {
                     let username = chat.username();
                     info!(count, username, "成功解析链接并加入");
-                    // 保存chat
-                    ctx.persist
-                        .put_chat(chat::ActiveModel::from_chat(&chat, source))
-                        .await?;
                 } else {
                     info!(count, "未能解析链接");
                 }
@@ -93,6 +85,7 @@ impl ScanLink {
         link_id: i32,
         chat_msg: ChatMessage,
         ctx: Context,
+        source: Source,
     ) -> Result<Option<Chat>> {
         let chat_name = chat_msg.username.as_str(); // 群组名
 
@@ -107,15 +100,12 @@ impl ScanLink {
         } else {
             // 未采集
             warn!(chat_name, "新采集群组名");
-            ctx.resolve_username(chat_name)
-                .await
-                .ok_or_warn()
-                .flatten()
+            ctx.resolve_username(chat_name).await.ok_or_warn().flatten()
         };
 
         if let Some(chat) = &chat {
             // 加入chat
-            ctx.join_chat_try_quit(chat).await?;
+            ctx.join_chat(chat, source).await?;
             // 将链接标记为已提取
             ctx.persist
                 .set_link_extracted(link_id, Some(chat.pack()))
@@ -130,16 +120,13 @@ impl ScanLink {
 
     async fn parse_invite(link_id: i32, invite: Invite, ctx: Context) -> Result<Option<Chat>> {
         let link = invite.invite_link.as_str();
-        let chat = ctx.join_invite_link(link).await?;
+        let chat = ctx.join_invite_link(link, invite.source).await?;
 
         if let Some(chat) = chat {
             warn!(link, "加入邀请链接");
             // 将链接标记为已提取
             ctx.persist
                 .set_link_extracted(link_id, Some(chat.pack()))
-                .await?;
-            ctx.persist
-                .put_chat(chat::ActiveModel::from_chat(&chat, invite.source))
                 .await?;
             Ok(Some(chat))
         } else {
@@ -167,9 +154,7 @@ impl ScanLink {
 
         if let Some(chat) = ctx.resolve_username(&may_channel.username).await? {
             warn!(chat_name = chat_username, "新采集群组名");
-            ctx.persist
-                .put_chat(chat::ActiveModel::from_chat(&chat, may_channel.source))
-                .await?;
+            ctx.join_chat(&chat, may_channel.source).await?;
             // 将链接标记为已提取，无pack
             ctx.persist
                 .set_link_extracted(link_id, Some(chat.pack()))

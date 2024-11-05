@@ -1,23 +1,23 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::NaiveDateTime;
 use grammers_client::types::PackedChat;
-use sea_orm::{EntityTrait, PaginatorTrait};
 use tracing::{info, warn};
 
-use crate::{
-    chat::{self, PackedChatOnly},
-    message, App, Context, PrintError, Runable, Source,
-};
+use crate::{message, Context, PrintError, Runable, Source};
 
 pub struct History {
     packed_chat: PackedChat,
     limit: usize,
+    since: NaiveDateTime,
 }
 impl History {
-    pub fn new(packed_chat: PackedChat, limit: usize) -> Self {
-        Self { packed_chat, limit }
+    pub fn new(packed_chat: PackedChat, limit: usize, since: NaiveDateTime) -> Self {
+        Self {
+            packed_chat,
+            limit,
+            since,
+        }
     }
 }
 #[async_trait]
@@ -33,12 +33,7 @@ impl Runable for History {
             .client
             .iter_messages(self.packed_chat)
             .limit(limit)
-            .max_date(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("时间不够倒退")
-                    .as_secs() as i32,
-            );
+            .max_date(self.since.and_utc().timestamp() as i32);
 
         // 循环前的准备
         let chat_id = self.packed_chat.id;
@@ -60,39 +55,5 @@ impl Runable for History {
         }
         warn!(chat_id, count, limit, "获取聊天记录-结束");
         Ok(())
-    }
-}
-
-pub struct FullHistory {
-    limit: usize,
-}
-impl FullHistory {
-    pub fn new(limit: usize) -> Self {
-        FullHistory { limit }
-    }
-}
-
-impl App for FullHistory {
-    fn name(&self) -> &'static str {
-        "全量历史消息镜像"
-    }
-    async fn ignite(&mut self, ctx: Context) -> Option<()> {
-        let db = &ctx.persist.db;
-        let mut chat_iter = chat::Entity::find()
-            .into_partial_model::<PackedChatOnly>()
-            .paginate(db, 16);
-
-        while let Some(chats) = chat_iter.fetch_and_next().await.ok_or_log().flatten() {
-            for packed_chat in chats
-                .iter()
-                .map(|m| m.packed().ok_or_warn())
-                .filter(|m| m.is_some())
-                .map(|m| m.unwrap())
-                .into_iter()
-            {
-                ctx.add_runable(History::new(packed_chat, self.limit)).await;
-            }
-        }
-        Some(())
     }
 }

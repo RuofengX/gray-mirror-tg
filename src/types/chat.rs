@@ -47,7 +47,7 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
-    pub fn from_chat(chat: &grammers_client::types::Chat, source: Source) -> Self {
+    pub fn from_chat(chat: &grammers_client::types::Chat, joined: bool, source: Source) -> Self {
         let usernames = chat
             .username()
             .map(|username| vec![username])
@@ -63,7 +63,7 @@ impl ActiveModel {
             packed: Set(chat.pack().to_hex()),
             source: Set(source.ty),
             source_id: Set(source.id),
-            joined: Set(true),
+            joined: Set(joined),
             ..Default::default()
         }
     }

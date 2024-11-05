@@ -25,8 +25,8 @@ async fn main() -> Result<()> {
 
     let ctx = Context::new().await?;
 
-    // 主动获取历史100条，防止错过
-    // ctx.add_app(app::FullHistory::new(100)).await;
+    // 同步聊天状态
+    // ctx.add_runable(app::mirror::eliminate::SyncChat::new()).await;
 
     // 主动扫描数据库链接
     ctx.add_runable(app::ScanLink::new()).await;

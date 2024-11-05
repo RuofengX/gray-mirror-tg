@@ -78,22 +78,22 @@ impl TryFrom<link::Model> for LinkParse {
         if let Some(part2) = path.next() {
             if let Ok(part2_num) = part2.parse::<i32>() {
                 debug!("[2]是消息编号 >> {}", value.link);
-                let rtn = Self::ChatMessage(ChatMessage {
+                let ret = Self::ChatMessage(ChatMessage {
                     username: part1,
                     msg_id: part2_num,
                     source,
                 });
-                return Ok(rtn);
+                return Ok(ret);
             } else {
                 bail!("[2]不是消息编号 >> {}", value.link);
             }
         } else {
             debug!("[1]可能是群组链接 >> {}", value.link);
-            let rtn = Self::MaybeChannel(MaybeChannel {
+            let ret = Self::MaybeChannel(MaybeChannel {
                 username: part1,
                 source,
             });
-            return Ok(rtn);
+            return Ok(ret);
         };
     }
 }

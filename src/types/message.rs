@@ -41,7 +41,7 @@ impl MessageExt {
     }
 
     pub fn links(&self) -> Vec<link::Link> {
-        let mut rtn = Vec::new();
+        let mut ret = Vec::new();
         let words: Vec<u16> = self.inner.raw.message.encode_utf16().collect();
 
         if let Some(ref ents) = self.inner.raw.entities {
@@ -54,7 +54,7 @@ impl MessageExt {
                         let len = url.length as usize;
 
                         if let Ok(desc) = String::from_utf16(&words[offset..offset + len]) {
-                            rtn.push(link::Link { link, desc });
+                            ret.push(link::Link { link, desc });
                         } else {
                             warn!("提取链接时错误");
                         }
@@ -64,20 +64,20 @@ impl MessageExt {
             }
         }
 
-        rtn
+        ret
     }
 
     pub fn callback_buttons(&self) -> Vec<KeyboardButtonCallback> {
         let reply_markup = &self.inner.raw.reply_markup;
 
-        let mut rtn = Vec::new();
+        let mut ret = Vec::new();
         if let Some(tl::enums::ReplyMarkup::ReplyInlineMarkup(markup)) = reply_markup {
             for row in markup.rows.iter() {
                 let tl::enums::KeyboardButtonRow::Row(row) = row;
                 for b in row.buttons.iter() {
                     match b {
                         tl::enums::KeyboardButton::Callback(callback_b) => {
-                            rtn.push(callback_b.clone());
+                            ret.push(callback_b.clone());
                         }
                         _ => (),
                     }
@@ -85,7 +85,7 @@ impl MessageExt {
             }
         }
 
-        rtn
+        ret
     }
 
     pub async fn click_callback_button(

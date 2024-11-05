@@ -75,8 +75,6 @@ impl Runable for ScanLink {
                     ctx.persist
                         .put_chat(chat::ActiveModel::from_chat(&chat, source))
                         .await?;
-                    // 告诉后台进程获取历史
-                    ctx.channel.fetch_history.send(chat.pack())?;
                 } else {
                     info!(count, "未能解析链接");
                 }

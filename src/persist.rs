@@ -70,13 +70,13 @@ impl Database {
             .exec(&trans)
             .await?;
 
-        let rtn = message::Entity::find_by_id((chat_id, msg_id))
+        let ret = message::Entity::find_by_id((chat_id, msg_id))
             .one(&trans)
             .await?
             .expect("事务进行中");
 
         trans.commit().await?;
-        Ok(rtn)
+        Ok(ret)
     }
 
     pub async fn put_chat(&self, data: chat::ActiveModel) -> Result<chat::Model> {
@@ -87,7 +87,7 @@ impl Database {
         if let Some(exist) = exist {
             Ok(exist)
         } else {
-            let rtn = chat::Entity::insert(data)
+            let ret = chat::Entity::insert(data)
                 .on_conflict(
                     OnConflict::column(chat::Column::ChatId)
                         .do_nothing()
@@ -95,7 +95,7 @@ impl Database {
                 )
                 .exec_with_returning(&self.db)
                 .await?;
-            Ok(rtn)
+            Ok(ret)
         }
     }
 
@@ -107,7 +107,7 @@ impl Database {
         if let Some(exist) = exist {
             Ok(exist)
         } else {
-            let rtn = link::Entity::insert(data)
+            let ret = link::Entity::insert(data)
                 .on_conflict(
                     OnConflict::column(link::Column::Link)
                         .do_nothing()
@@ -115,13 +115,13 @@ impl Database {
                 )
                 .exec_with_returning(&self.db)
                 .await?;
-            Ok(rtn)
+            Ok(ret)
         }
     }
 
     pub async fn put_search(&self, data: search::ActiveModel) -> Result<search::Model> {
-        let rtn = data.insert(&self.db).await?;
-        Ok(rtn)
+        let ret = data.insert(&self.db).await?;
+        Ok(ret)
     }
 
     pub async fn find_chat(&self, username: Option<&str>) -> Result<Option<chat::Model>> {
@@ -135,12 +135,12 @@ impl Database {
             r#"SELECT * FROM "chat" WHERE $1 = ANY("usernames")"#,
             [username.into()],
         );
-        let rtn = chat::Entity::find()
+        let ret = chat::Entity::find()
             .from_raw_sql(raw_sql)
             .one(&self.db)
             .await?;
 
-        Ok(rtn)
+        Ok(ret)
     }
 
     pub async fn set_link_extracted(

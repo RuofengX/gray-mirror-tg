@@ -64,7 +64,7 @@ impl Context {
             logger.init();
         }
 
-        let rtn = Self(Arc::new(ContextInner {
+        let ret = Self(Arc::new(ContextInner {
             client: crate::login::login_with_dotenv().await?,
             background_tasks: Mutex::new(background_tasks),
             persist: Database::new().await?,
@@ -72,7 +72,7 @@ impl Context {
             interval: Default::default(),
         }));
 
-        Ok(rtn)
+        Ok(ret)
     }
 
     pub async fn add_app(&self, mut value: impl App) -> () {
@@ -115,35 +115,35 @@ impl Context {
 
     pub async fn resolve_username(&self, username: &str) -> Result<Option<Chat>> {
         self.interval.resolve_username.tick().await;
-        let mut rtn = self.client.resolve_username(username).await;
-        if let Err(e) = rtn {
+        let mut ret = self.client.resolve_username(username).await;
+        if let Err(e) = ret {
             wait_on_flood(e).await;
             warn!("重新尝试");
             self.interval.resolve_username.tick().await;
-            rtn = self.client.resolve_username(username).await;
+            ret = self.client.resolve_username(username).await;
         }
-        let rtn = rtn.unwrap_or_log().flatten();
-        Ok(rtn)
+        let ret = ret.unwrap_or_log().flatten();
+        Ok(ret)
     }
 
     pub async fn join_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<Chat>> {
         self.interval.join_chat.tick().await;
         let chat = Into::<PackedChat>::into(chat);
         let id = chat.id;
-        let mut rtn = self.client.join_chat(chat).await;
-        if let Err(e) = rtn {
+        let mut ret = self.client.join_chat(chat).await;
+        if let Err(e) = ret {
             wait_on_flood(e).await;
             warn!("重新尝试");
             self.interval.join_chat.tick().await;
-            rtn = self.client.join_chat(chat).await;
+            ret = self.client.join_chat(chat).await;
         }
-        let rtn = rtn.unwrap_or_log().flatten();
-        if let Some(rtn) = &rtn {
-            warn!(chat_name = rtn.name(), chat_id = rtn.id(), "加入聊天");
+        let ret = ret.unwrap_or_log().flatten();
+        if let Some(ret) = &ret {
+            warn!(chat_name = ret.name(), chat_id = ret.id(), "加入聊天");
         } else {
             error!(chat_id = id, "加入聊天失败");
         }
-        Ok(rtn)
+        Ok(ret)
     }
 }
 

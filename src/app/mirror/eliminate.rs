@@ -37,7 +37,7 @@ impl Runable for Sentence {
         loop {
             let result = tick(&mut ticker, ctx.clone()).await;
             if result.is_err() {
-                result.into_log();
+                result.ok_or_warn();
                 continue;
             }
         }

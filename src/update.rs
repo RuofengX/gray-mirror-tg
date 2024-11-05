@@ -52,7 +52,7 @@ pub trait Updater: Send + Sync + 'static {
                 _ => None,
             }
         };
-        result.and_then(|some| some.unwrap_or_log())
+        result.and_then(|some| some.ok_or_log())
     }
 
     /// default implement will fliter all message that incoming

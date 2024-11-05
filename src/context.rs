@@ -3,6 +3,7 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 use anyhow::Result;
 use dotenv_codegen::dotenv;
 use grammers_client::{
+    grammers_tl_types as tl,
     types::{Chat, PackedChat},
     Client, InvocationError,
 };
@@ -10,7 +11,7 @@ use tokio::{
     sync::{Mutex, RwLock},
     task::JoinSet,
 };
-use tracing::{error, level_filters::STATIC_MAX_LEVEL, warn};
+use tracing::{error, info, level_filters::STATIC_MAX_LEVEL, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
@@ -107,7 +108,7 @@ impl Context {
     /// Run until error occurs. Return first error.
     pub async fn run(self) -> Result<()> {
         while let Some(result) = self.background_tasks.lock().await.join_next().await {
-            result.unwrap_or_log();
+            result.ok_or_log();
         }
         warn!("全部任务结束");
         Ok(())
@@ -116,34 +117,107 @@ impl Context {
     pub async fn resolve_username(&self, username: &str) -> Result<Option<Chat>> {
         self.interval.resolve_username.tick().await;
         let mut ret = self.client.resolve_username(username).await;
-        if let Err(e) = ret {
-            wait_on_flood(e).await;
+        if wait_on_flood(&ret).await.is_some() {
             warn!("重新尝试");
             self.interval.resolve_username.tick().await;
             ret = self.client.resolve_username(username).await;
         }
-        let ret = ret.unwrap_or_log().flatten();
+        let ret = ret.ok_or_log().flatten();
         Ok(ret)
     }
 
-    pub async fn join_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<Chat>> {
+    pub async fn join_chat_raw(
+        &self,
+        chat: impl Into<PackedChat>,
+    ) -> Result<Option<Chat>, InvocationError> {
         self.interval.join_chat.tick().await;
         let chat = Into::<PackedChat>::into(chat);
         let id = chat.id;
         let mut ret = self.client.join_chat(chat).await;
-        if let Err(e) = ret {
-            wait_on_flood(e).await;
+        if wait_on_flood(&ret).await.is_some() {
             warn!("重新尝试");
             self.interval.join_chat.tick().await;
             ret = self.client.join_chat(chat).await;
         }
-        let ret = ret.unwrap_or_log().flatten();
+        let ret = ret.ok_or_log().flatten();
         if let Some(ret) = &ret {
             warn!(chat_name = ret.name(), chat_id = ret.id(), "加入聊天");
         } else {
             error!(chat_id = id, "加入聊天失败");
         }
         Ok(ret)
+    }
+
+    pub async fn quit_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<()>> {
+        self.interval.quit_chat.tick().await;
+        let chat = Into::<PackedChat>::into(chat);
+        let id = chat.id;
+        let mut ret = self.client.delete_dialog(chat).await;
+        if wait_on_flood(&ret).await.is_some() {
+            warn!("重新尝试");
+            self.interval.join_chat.tick().await;
+            ret = self.client.delete_dialog(chat).await;
+        }
+        let ret = ret.ok_or_log();
+        match ret {
+            Some(_) => warn!(chat_id = id, "退出聊天"),
+            None => error!(chat_id = id, "退出聊天失败"),
+        }
+        Ok(ret)
+    }
+
+    /// Join chat, quit exist chat if chat list is full.
+    pub async fn join_chat_try_quit(&self, chat: impl Into<PackedChat>) -> Result<Option<Chat>> {
+        let chat = Into::<PackedChat>::into(chat);
+        let id = chat.id;
+        let mut ret = self.join_chat_raw(chat).await;
+        if quit_chat_on_too_much(&ret, self.clone()).await.is_some() {
+            warn!(id, "重新尝试");
+            ret = self.join_chat_raw(chat).await;
+        };
+        let ret = ret.ok_or_log().flatten();
+        if let Some(ret) = &ret {
+            warn!(chat_name = ret.name(), chat_id = ret.id(), "加入聊天");
+        } else {
+            error!(chat_id = id, "加入聊天失败");
+        }
+        Ok(ret)
+    }
+
+    pub async fn join_invite_link(&self, link: &str) -> Result<Option<Chat>> {
+        self.interval.join_chat.tick().await;
+        let mut updates = self.client.accept_invite_link(link).await;
+        if quit_chat_on_too_much(&updates, self.clone())
+            .await
+            .is_some()
+        {
+            warn!(link, "重新尝试");
+            self.interval.join_chat.tick().await;
+            updates = self.client.accept_invite_link(link).await;
+        }
+        if let Some(updates) = updates.ok_or_log() {
+            let chats = match updates {
+                tl::enums::Updates::Combined(updates) => Some(updates.chats),
+                tl::enums::Updates::Updates(updates) => Some(updates.chats),
+                _ => None,
+            };
+            let chat = match chats {
+                Some(chats) if !chats.is_empty() => {
+                    Some(grammers_client::types::Chat::from_raw(chats[0].clone()))
+                }
+                Some(chats) if chats.is_empty() => None,
+                None => None,
+                Some(_) => None,
+            };
+            if let Some(chat) = &chat {
+                warn!(chat_name = chat.name(), chat_id = chat.id(), "加入聊天");
+            } else {
+                error!(link, "加入聊天失败");
+            }
+            return Ok(chat);
+        };
+        error!(link, "加入聊天失败");
+        Ok(None)
     }
 }
 
@@ -166,6 +240,7 @@ impl Interval {
 
 pub struct IntervalSet {
     pub join_chat: Interval,
+    pub quit_chat: Interval,
     pub unpack_chat: Interval,
     pub resolve_username: Interval,
     pub find_msg: Interval,
@@ -174,6 +249,7 @@ impl Default for IntervalSet {
     fn default() -> Self {
         Self {
             join_chat: Interval::from_secs(300),
+            quit_chat: Interval::from_secs(300),
             resolve_username: Interval::from_secs(60),
             unpack_chat: Interval::from_millis(500),
             find_msg: Interval::from_millis(15),
@@ -181,10 +257,12 @@ impl Default for IntervalSet {
     }
 }
 
-async fn wait_on_flood(e: InvocationError) -> Option<()> {
+async fn wait_on_flood<T>(result: &Result<T, InvocationError>) -> Option<()> {
+    let e = if let Err(e) = result { e } else { return None };
     match e {
         InvocationError::Rpc(e) => {
             if e.code == 420 {
+                // TODO: 添加and逻辑，e.name.eq(name of FLOOD)
                 warn!("服务器警告FLOOD_WAIT");
                 if let Some(cooldown) = e.value {
                     warn!(cooldown, "尝试休眠");
@@ -196,5 +274,38 @@ async fn wait_on_flood(e: InvocationError) -> Option<()> {
         }
         _ => (),
     };
-    return None;
+    None
+}
+
+async fn quit_chat_on_too_much(
+    result: &Result<impl std::fmt::Debug, InvocationError>,
+    ctx: Context,
+) -> Option<()> {
+    error!("{:#?}", result);
+    let e = if let Err(e) = result { e } else { return None };
+    match e {
+        InvocationError::Rpc(e) => {
+            if e.code == 400 && e.name.eq("CHANNELS_TOO_MUCH") {
+                warn!("服务器警告CHANNELS_TOO_MUCH");
+                info!("尝试退出聊天");
+                let chat = ctx
+                    .persist
+                    .find_quit_candidate()
+                    .await
+                    .ok_or_log()
+                    .flatten()
+                    .map(|c| c.packed().ok_or_log())
+                    .flatten();
+                if let Some(chat) = chat {
+                    ctx.quit_chat(chat).await.into_log();
+                } else {
+                    warn!("尝试退出聊天时发生错误，放弃处理");
+                    return None;
+                }
+                return Some(());
+            }
+        }
+        _ => (),
+    };
+    None
 }

@@ -38,7 +38,7 @@ pub struct Model {
     pub source: SourceType,
     pub source_id: i64,
     pub joined: bool,
-    pub last_updated: DateTime,
+    pub last_update: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

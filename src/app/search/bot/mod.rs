@@ -47,7 +47,7 @@ impl App for SearchLink {
                 keyword: Set(keyword.to_string()),
                 ..Default::default()
             };
-            let search = ctx.persist.put_search(search).await.unwrap_or_log()?;
+            let search = ctx.persist.put_search(search).await.ok_or_log()?;
             let source = Source::from_search(&search);
 
             // 时间同步量

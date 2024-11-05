@@ -162,9 +162,41 @@ impl Database {
 
     pub async fn find_update_candidate(&self) -> Result<Option<chat::Model>> {
         let ret = chat::Entity::find()
-            .order_by(chat::Column::LastUpdated, Order::Asc)
-            .one(&self.db).await?;
+            .order_by(chat::Column::LastUpdate, Order::Asc)
+            .one(&self.db)
+            .await?;
         Ok(ret)
+    }
 
+    pub async fn find_quit_candidate(&self) -> Result<Option<chat::Model>> {
+        let ret = chat::Entity::find()
+            .order_by(chat::Column::LastUpdate, Order::Desc)
+            .one(&self.db)
+            .await?;
+        Ok(ret)
+    }
+
+    pub async fn set_chat_quited(&self, chat_id: i64) -> Result<Option<chat::Model>> {
+        let exist = chat::Entity::find_by_id(chat_id).one(&self.db).await?;
+        if let Some(exist) = exist {
+            let mut model = exist.into_active_model();
+            model.joined = Set(false);
+            let updated = model.update(&self.db).await?;
+            Ok(Some(updated))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn set_chat_updated(&self, chat_id: i64, last_update: DateTime) -> Result<Option<chat::Model>> {
+        let exist = chat::Entity::find_by_id(chat_id).one(&self.db).await?;
+        if let Some(exist) = exist {
+            let mut model = exist.into_active_model();
+            model.last_update= Set(last_update);
+            let updated = model.update(&self.db).await?;
+            Ok(Some(updated))
+        } else {
+            Ok(None)
+        }
     }
 }

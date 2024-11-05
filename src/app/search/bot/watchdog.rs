@@ -58,7 +58,7 @@ impl Runable for Watchdog {
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)
                     .await
-                    .unwrap_or_warn();
+                    .ok_or_warn();
                 *last = tokio::time::Instant::now();
             }
         }

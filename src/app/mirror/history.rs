@@ -46,7 +46,7 @@ impl Runable for History {
         let mut count = 0;
         warn!(chat_id, limit, "获取聊天记录-开始");
 
-        while let Some(Some(msg)) = history.next().await.unwrap_or_warn() {
+        while let Some(Some(msg)) = history.next().await.ok_or_warn() {
             ctx.interval.find_msg.tick().await;
             count += 1;
             info!(chat_id, count, limit, "获取聊天记录");
@@ -82,10 +82,10 @@ impl App for FullHistory {
             .into_partial_model::<PackedChatOnly>()
             .paginate(db, 16);
 
-        while let Some(chats) = chat_iter.fetch_and_next().await.unwrap_or_log().flatten() {
+        while let Some(chats) = chat_iter.fetch_and_next().await.ok_or_log().flatten() {
             for packed_chat in chats
                 .iter()
-                .map(|m| m.packed().unwrap_or_warn())
+                .map(|m| m.packed().ok_or_warn())
                 .filter(|m| m.is_some())
                 .map(|m| m.unwrap())
                 .into_iter()

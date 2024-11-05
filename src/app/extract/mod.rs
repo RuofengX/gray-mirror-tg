@@ -1,6 +1,5 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use grammers_client::grammers_tl_types as tl;
 use grammers_client::types::Chat;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use tracing::{info, warn};
@@ -40,7 +39,7 @@ impl Runable for ScanLink {
                 info!(count, "处理链接");
 
                 // 将链接尝试转换为 (群组名-消息id) 结构
-                let link = LinkParse::try_from(link_model).unwrap_or_warn();
+                let link = LinkParse::try_from(link_model).ok_or_warn();
                 if link.is_none() {
                     continue;
                 }
@@ -54,17 +53,17 @@ impl Runable for ScanLink {
                     LinkParse::ChatMessage(chat_msg) => {
                         Self::parse_chat_msg(id, chat_msg, ctx.clone())
                             .await
-                            .unwrap_or_log()
+                            .ok_or_log()
                             .flatten()
                     }
                     LinkParse::Invite(invite) => Self::parse_invite(id, invite, ctx.clone())
                         .await
-                        .unwrap_or_log()
+                        .ok_or_log()
                         .flatten(),
                     LinkParse::MaybeChannel(channel) => {
                         Self::parse_channel(id, channel, ctx.clone())
                             .await
-                            .unwrap_or_log()
+                            .ok_or_log()
                             .flatten()
                     }
                 };
@@ -110,13 +109,13 @@ impl ScanLink {
             warn!(chat_name, "新采集群组名");
             ctx.resolve_username(chat_name)
                 .await
-                .unwrap_or_warn()
+                .ok_or_warn()
                 .flatten()
         };
 
         if let Some(chat) = &chat {
             // 加入chat
-            ctx.join_chat(chat).await?;
+            ctx.join_chat_try_quit(chat).await?;
             // 将链接标记为已提取
             ctx.persist
                 .set_link_extracted(link_id, Some(chat.pack()))
@@ -131,31 +130,7 @@ impl ScanLink {
 
     async fn parse_invite(link_id: i32, invite: Invite, ctx: Context) -> Result<Option<Chat>> {
         let link = invite.invite_link.as_str();
-
-        // 加入chat
-        ctx.interval.join_chat.tick().await;
-        let updates = ctx.client.accept_invite_link(link).await.unwrap_or_log();
-        if updates.is_none() {
-            warn!(link, "未能加入邀请链接");
-            // 将链接标记为已提取，无pack
-            ctx.persist.set_link_extracted(link_id, None).await?;
-            return Ok(None);
-        }
-        let updates = updates.unwrap();
-
-        let chats = match updates {
-            tl::enums::Updates::Combined(updates) => Some(updates.chats),
-            tl::enums::Updates::Updates(updates) => Some(updates.chats),
-            _ => None,
-        };
-        let chat = match chats {
-            Some(chats) if !chats.is_empty() => {
-                Some(grammers_client::types::Chat::from_raw(chats[0].clone()))
-            }
-            Some(chats) if chats.is_empty() => None,
-            None => None,
-            Some(_) => None,
-        };
+        let chat = ctx.join_invite_link(link).await?;
 
         if let Some(chat) = chat {
             warn!(link, "加入邀请链接");

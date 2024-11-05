@@ -163,23 +163,28 @@ impl Database {
         }
     }
 
-    pub async fn find_update_candidate(&self) -> Result<chat::Model> {
-        let ret = chat::Entity::find()
-            .filter(chat::Column::Joined.eq(true))
+    pub async fn find_oldest_chat(&self, joined: Option<bool>) -> Result<Option<chat::Model>> {
+        let mut select = chat::Entity::find();
+        if let Some(j) = joined {
+            select = select.filter(chat::Column::Joined.eq(j));
+        };
+        let ret = select
             .order_by(chat::Column::LastUpdate, Order::Asc)
             .one(&self.db)
-            .await?
-            .expect("数据库为空");
+            .await?;
         Ok(ret)
     }
 
-    pub async fn find_quit_candidate(&self) -> Result<chat::Model> {
-        let ret = chat::Entity::find()
-            .filter(chat::Column::Joined.eq(true))
+    pub async fn find_latest_chat(&self, joined: Option<bool>) -> Result<Option<chat::Model>> {
+        let mut select = chat::Entity::find();
+        if let Some(j) = joined {
+            select = select.filter(chat::Column::Joined.eq(j));
+        };
+        let ret = select
             .order_by(chat::Column::LastUpdate, Order::Desc)
             .one(&self.db)
-            .await?
-            .expect("数据库为空");
+            .await?;
+
         Ok(ret)
     }
 

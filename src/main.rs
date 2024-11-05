@@ -28,7 +28,11 @@ async fn main() -> Result<()> {
     // 同步聊天状态
     // ctx.add_runable(app::mirror::eliminate::SyncChat::new()).await;
 
-    // 主动扫描数据库链接
+    // 维护退出的聊天
+    ctx.add_runable(app::mirror::eliminate::Sentence::new())
+        .await;
+
+    // 主动扫描数据库链接表
     ctx.add_runable(app::ScanLink::new()).await;
 
     // 主动搜索

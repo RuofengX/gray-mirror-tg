@@ -1,12 +1,13 @@
 use std::{ops::Deref, sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use dotenv_codegen::dotenv;
 use grammers_client::{
     grammers_tl_types as tl,
     types::{Chat, PackedChat},
     Client, InvocationError,
 };
+use sea_orm::EntityTrait;
 use tokio::{
     sync::{Mutex, RwLock},
     task::JoinSet,
@@ -127,7 +128,7 @@ impl Context {
         Ok(ret)
     }
 
-    pub async fn freeze_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<()>> {
+    pub async fn quit_chat(&self, chat: impl Into<PackedChat>) -> Result<Option<()>> {
         self.interval.quit_chat.tick().await;
         let chat = Into::<PackedChat>::into(chat);
         let id = chat.id;
@@ -138,18 +139,17 @@ impl Context {
             ret = self.client.delete_dialog(chat).await;
         }
         let ret = ret.ok_or_log();
-        match ret {
-            Some(_) => {
-                self.persist.set_chat_quited(id).await?;
-                warn!(chat_id = id, "退出聊天");
-            }
-            None => error!(chat_id = id, "退出聊天失败"),
+        if ret.is_some() {
+            self.persist.set_chat_quited(id).await?;
+            warn!(chat_id = id, "退出聊天");
+        } else {
+            warn!(chat_id = id, "退出聊天失败");
         }
         Ok(ret)
     }
 
     /// Join chat, quit exist chat if chat list is full.
-    pub async fn join_chat(&self, chat: impl Into<PackedChat>, source: Source) -> Result<Chat> {
+    pub async fn join_new_chat(&self, chat: impl Into<PackedChat>, source: Source) -> Result<Chat> {
         let chat = Into::<PackedChat>::into(chat);
         let id = chat.id;
         let mut ret = self.join_chat_raw(chat).await;
@@ -161,6 +161,26 @@ impl Context {
         self.persist
             .put_chat(chat::ActiveModel::from_chat(&ret, true, source))
             .await?;
+        Ok(ret)
+    }
+
+    pub async fn join_quited_chat(&self, chat_id: i64) -> Result<Chat> {
+        let db = &self.persist.db;
+        let chat = chat::Entity::find_by_id(chat_id).one(db).await?;
+        if chat.is_none() {
+            bail!("不存在chat_id{chat_id}")
+        }
+        let chat = chat.unwrap().packed()?;
+        let id = chat.id;
+
+        let mut ret = self.join_chat_raw(chat).await;
+        if self.quit_chat_on_too_much(&ret).await.is_some() {
+            info!(id, "重新尝试");
+            ret = self.join_chat_raw(chat).await;
+        };
+        let ret = ret?;
+
+        self.persist.set_chat_joined(chat_id).await?;
         Ok(ret)
     }
 
@@ -231,13 +251,14 @@ impl Context {
                     info!("尝试退出聊天");
                     let chat = self
                         .persist
-                        .find_quit_candidate()
+                        .find_latest_chat(None)
                         .await
                         .ok_or_log()
+                        .flatten()
                         .map(|c| c.packed().ok_or_log())
                         .flatten();
                     if let Some(chat) = chat {
-                        self.freeze_chat(chat).await.into_log();
+                        self.quit_chat(chat).await.into_log();
                     } else {
                         warn!("尝试退出聊天时发生错误，放弃处理");
                         return None;

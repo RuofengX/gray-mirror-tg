@@ -105,7 +105,7 @@ impl ScanLink {
 
         if let Some(chat) = &chat {
             // 加入chat
-            ctx.join_chat(chat, source).await?;
+            ctx.join_new_chat(chat, source).await?;
             // 将链接标记为已提取
             ctx.persist
                 .set_link_extracted(link_id, Some(chat.pack()))
@@ -154,7 +154,7 @@ impl ScanLink {
 
         if let Some(chat) = ctx.resolve_username(&may_channel.username).await? {
             warn!(chat_name = chat_username, "新采集群组名");
-            ctx.join_chat(&chat, may_channel.source).await?;
+            ctx.join_new_chat(&chat, may_channel.source).await?;
             // 将链接标记为已提取，无pack
             ctx.persist
                 .set_link_extracted(link_id, Some(chat.pack()))

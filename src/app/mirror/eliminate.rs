@@ -4,12 +4,13 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+use tokio::time::Interval;
 use tracing::warn;
 
-use crate::{app::History, Context, Runable};
+use crate::{app::History, Context, PrintError, Runable};
 
 /// # Process Model
-/// 
+///
 ///   Latest < ---Joined ---|----Quit  --------------------- > Oldest
 ///
 ///   0. sync chat join status
@@ -34,34 +35,46 @@ impl Runable for Sentence {
         let mut ticker = tokio::time::interval(Duration::from_secs(10));
 
         loop {
-            ticker.tick().await;
-            // 0. sync chat join status
-            ctx.persist.sync_chat_joined(ctx.clone()).await?;
-
-            // 1.
-            let oldest_quit = ctx.persist.find_oldest_chat(Some(false)).await?;
-            if oldest_quit.is_none() {
-                return Ok(());
-            }
-            let chat = oldest_quit.unwrap();
-
-            // 2.
-            let mut task = History::new(chat.packed()?, 1000000, chat.last_update);
-            task.run(ctx.clone()).await?;
-
-            // 3.
-            let mut chat = chat.into_active_model();
-            chat.last_update = Set(Utc::now().naive_utc());
-            chat.update(&ctx.persist.db).await?;
-
-            // 4. 
-            if let Some(oldest_joined) = ctx.persist.find_oldest_chat(Some(true)).await? {
-                ctx.quit_chat(oldest_joined.packed()?).await?;
-            } else {
-                warn!("未能找到最老的已加入聊天");
+            let result = tick(&mut ticker, ctx.clone()).await;
+            if result.is_err() {
+                result.into_log();
+                continue;
             }
         }
     }
+}
+
+async fn tick(ticker: &mut Interval, ctx: Context) -> Result<()> {
+    ticker.tick().await;
+
+    // 0. sync chat join status
+    ctx.persist.sync_chat_joined(ctx.clone()).await?;
+
+    // 1. join oldest-quit chat
+    let oldest_quit = ctx.persist.find_oldest_chat(Some(false)).await?;
+    if oldest_quit.is_none() {
+        return Ok(());
+    }
+    let chat = oldest_quit.unwrap();
+    ctx.join_quited_chat(chat.chat_id).await.into_log();
+
+    // 2. fetch all history
+    let mut task = History::new(chat.packed()?, 1000000, chat.last_update);
+    task.run(ctx.clone()).await.into_log();
+
+    // 3. set update time
+    let mut chat = chat.into_active_model();
+    chat.last_update = Set(Utc::now().naive_utc());
+    chat.update(&ctx.persist.db).await?;
+
+    // 4. quit oldest-joined chat
+    if let Some(oldest_joined) = ctx.persist.find_oldest_chat(Some(true)).await? {
+        ctx.quit_chat(oldest_joined.packed()?).await.into_log();
+    } else {
+        warn!("未能找到最老的已加入聊天");
+    }
+
+    return Ok(());
 }
 
 pub struct SyncChat {}

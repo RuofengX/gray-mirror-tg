@@ -17,16 +17,13 @@ pub use error::PrintError;
 pub use types::*;
 pub use update::Updater;
 
-const KEYWORDS: [&str; 2] = ["园区", "担保公群"];
+const KEYWORDS: [&str; 5] = ["园区", "东南亚", "曝光", "担保公群", "需求"];
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> Result<()> {
     println!("你好世界!");
 
     let ctx = Context::new().await?;
-
-    // 同步聊天状态
-    // ctx.add_runable(app::mirror::eliminate::SyncChat::new()).await;
 
     // 维护退出的聊天
     ctx.add_runable(app::mirror::eliminate::Sentence::new())

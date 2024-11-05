@@ -37,8 +37,8 @@ pub struct Model {
     pub packed: String,
     pub source: SourceType,
     pub source_id: i64,
-    pub joined: bool, 
-    pub last_updated: Option<DateTime>,
+    pub joined: bool,
+    pub last_updated: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -64,7 +64,6 @@ impl ActiveModel {
             source: Set(source.ty),
             source_id: Set(source.id),
             joined: Set(true),
-            last_updated: Set(None),
             ..Default::default()
         }
     }

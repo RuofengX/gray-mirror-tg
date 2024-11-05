@@ -2,8 +2,8 @@ use anyhow::Result;
 use dotenv_codegen::dotenv;
 use grammers_client::types::PackedChat;
 use sea_orm::{
-    prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, IntoActiveModel, Schema, Set,
-    Statement, TransactionTrait,
+    prelude::*, sea_query::OnConflict, ConnectOptions, DbBackend, IntoActiveModel, Order,
+    QueryOrder, Schema, Set, Statement, TransactionTrait,
 };
 use tracing::debug;
 
@@ -143,16 +143,28 @@ impl Database {
         Ok(rtn)
     }
 
-    pub async fn set_link_extracted(&self, link_id: i32, packed: Option<PackedChat>) -> Result<Option<link::Model>> {
+    pub async fn set_link_extracted(
+        &self,
+        link_id: i32,
+        packed: Option<PackedChat>,
+    ) -> Result<Option<link::Model>> {
         let exist = link::Entity::find_by_id(link_id).one(&self.db).await?;
         if let Some(exist) = exist {
             let mut model = exist.into_active_model();
             model.parsed = Set(true);
-            model.packed = Set(packed.map(|p|p.to_hex()));
+            model.packed = Set(packed.map(|p| p.to_hex()));
             let updated = model.update(&self.db).await?;
             Ok(Some(updated))
         } else {
             Ok(None)
         }
+    }
+
+    pub async fn find_update_candidate(&self) -> Result<Option<chat::Model>> {
+        let ret = chat::Entity::find()
+            .order_by(chat::Column::LastUpdated, Order::Asc)
+            .one(&self.db).await?;
+        Ok(ret)
+
     }
 }

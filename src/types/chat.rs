@@ -37,6 +37,8 @@ pub struct Model {
     pub packed: String,
     pub source: SourceType,
     pub source_id: i64,
+    pub joined: bool, 
+    pub last_updated: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -61,6 +63,8 @@ impl ActiveModel {
             packed: Set(chat.pack().to_hex()),
             source: Set(source.ty),
             source_id: Set(source.id),
+            joined: Set(true),
+            last_updated: Set(None),
             ..Default::default()
         }
     }

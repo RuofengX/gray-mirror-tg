@@ -181,15 +181,11 @@ impl Database {
     pub async fn find_oldest_chat(
         &self,
         joined: Option<bool>,
-        no_user: bool,
     ) -> Result<Option<chat::Model>> {
         let mut select = chat::Entity::find();
         if let Some(j) = joined {
             select = select.filter(chat::Column::Joined.eq(j));
         };
-        if no_user {
-            select = select.filter(chat::Column::Ty.ne("user"))
-        }
         let ret = select
             .order_by(chat::Column::LastUpdate, Order::Asc)
             .one(&self.db)
@@ -200,15 +196,11 @@ impl Database {
     pub async fn find_latest_chat(
         &self,
         joined: Option<bool>,
-        no_user: bool,
     ) -> Result<Option<chat::Model>> {
         let mut select = chat::Entity::find();
         if let Some(j) = joined {
             select = select.filter(chat::Column::Joined.eq(j));
         };
-        if no_user {
-            select = select.filter(chat::Column::Ty.ne("user"))
-        }
         let ret = select
             .order_by(chat::Column::LastUpdate, Order::Desc)
             .one(&self.db)

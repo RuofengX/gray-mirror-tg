@@ -57,8 +57,8 @@ impl Runable for Watchdog {
         let mut ticker = tokio::time::interval(Duration::from_secs(7));
         loop {
             count += 1;
-            info!(count, engine, keyword, "WD检测");
             ticker.tick().await;
+            info!(count, engine, keyword, "WD检测");
             let mut last = self.last_update.lock().await;
             if tokio::time::Instant::now() - *last > BOT_RESP_TIMEOUT {
                 info!(count, engine, keyword, "搜索超时",);

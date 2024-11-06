@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -42,18 +42,27 @@ impl Runable for Watchdog {
     }
     async fn run(&mut self, ctx: Context) -> Result<()> {
         self.bot_resend_tick.lock().await.tick().await;
-        warn!(engine=self.engine.name, keyword=self.keyword, "发送初始消息");
+        warn!(
+            engine = self.engine.name,
+            keyword = self.keyword,
+            "发送初始消息"
+        );
         ctx.client
             .send_message(self.engine.chat, self.keyword)
             .await?;
 
+        let engine = self.engine.name;
+        let keyword = self.keyword;
+        let mut count = 0;
+        let mut ticker = tokio::time::interval(Duration::from_secs(7));
         loop {
+            count += 1;
+            info!(count, engine, keyword, "WD检测");
+            ticker.tick().await;
             let mut last = self.last_update.lock().await;
             if tokio::time::Instant::now() - *last > BOT_RESP_TIMEOUT {
-                let engine = self.engine.name;
-                let keyword = self.keyword;
-                info!(engine, keyword, "搜索超时",);
-                info!(engine, keyword, "重发送消息");
+                info!(count, engine, keyword, "搜索超时",);
+                info!(count, engine, keyword, "重发送消息");
                 self.bot_resend_tick.lock().await.tick().await;
                 ctx.client
                     .send_message(self.engine.chat, self.keyword)

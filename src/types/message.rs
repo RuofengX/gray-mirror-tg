@@ -129,7 +129,7 @@ impl ActiveModelBehavior for ActiveModel {}
 
 impl ActiveModel {
     pub fn from_inner_msg(msg: &grammers_client::types::Message, source: Source) -> Self {
-        let raw = Set(serde_json::to_value(&msg.raw).unwrap());
+        let raw = Set(serde_json::to_value(&msg.raw).expect("message::ActiveModel:: from_inner_msg >> 传入的msg无效"));
         Self {
             chat_id: Set(msg.chat().id()),
             msg_id: Set(msg.id()),

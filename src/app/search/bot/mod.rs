@@ -66,6 +66,7 @@ impl App for SearchLink {
                     .start_search(&keyword, source, time_sync.clone()),
             )
             .await;
+            tokio::time::sleep(Duration::from_secs(7)).await;
         }
         Some(())
     }

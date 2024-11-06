@@ -3,7 +3,6 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 use anyhow::{bail, Result};
 use dotenv_codegen::dotenv;
 use grammers_client::{
-    grammers_tl_types as tl,
     types::{Chat, PackedChat},
     Client, InvocationError,
 };
@@ -189,37 +188,22 @@ impl Context {
 
     pub async fn join_invite_link(&self, link: &str, source: Source) -> Result<Option<Chat>> {
         self.interval.join_chat.tick().await;
-        let mut updates = self.client.accept_invite_link(link).await;
-        if self.quit_chat_on_too_much(&updates).await.is_some() {
+        let mut chat = self.client.accept_invite_link(link).await;
+        if self.quit_chat_on_too_much(&chat).await.is_some() {
             warn!(link, "重新尝试");
             self.interval.join_chat.tick().await;
-            updates = self.client.accept_invite_link(link).await;
+            chat = self.client.accept_invite_link(link).await;
         }
-        if let Some(updates) = updates.ok_or_log() {
-            let chats = match updates {
-                tl::enums::Updates::Combined(updates) => Some(updates.chats),
-                tl::enums::Updates::Updates(updates) => Some(updates.chats),
-                _ => None,
-            };
-            let chat = match chats {
-                Some(chats) if !chats.is_empty() => {
-                    Some(grammers_client::types::Chat::from_raw(chats[0].clone()))
-                }
-                Some(chats) if chats.is_empty() => None,
-                None => None,
-                Some(_) => None,
-            };
-            if let Some(chat) = &chat {
-                self.persist
-                    .put_chat(chat::ActiveModel::from_chat(chat, true, source))
-                    .await?;
-                warn!(chat_name = chat.name(), chat_id = chat.id(), "加入聊天");
-            } else {
-                error!(link, "加入聊天失败");
-            }
-            return Ok(chat);
-        };
-        error!(link, "加入聊天失败");
+
+        if let Some(chat) = chat? {
+            self.persist
+                .put_chat(chat::ActiveModel::from_chat(&chat, true, source))
+                .await?;
+            info!(link, "加入邀请链接成功");
+            return Ok(Some(chat));
+        }
+
+        error!(link, "加入邀请链接失败");
         Ok(None)
     }
 
@@ -254,7 +238,7 @@ impl Context {
                     info!("尝试退出聊天以腾出空间");
                     let chat = self
                         .persist
-                        .find_oldest_chat(Some(true))
+                        .find_oldest_chat(Some(true), false)
                         .await
                         .ok_or_log()
                         .flatten()

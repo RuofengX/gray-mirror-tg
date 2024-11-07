@@ -47,7 +47,9 @@ impl Runable for History {
         while let Some(Some(msg)) = history.next().await.ok_or_warn() {
             ctx.interval.find_msg.tick().await;
             count += 1;
-            info!(chat_id, count, limit, delta_time, "获取聊天记录");
+            if count % 1000 == 0 {
+                info!(chat_id, count, limit, delta_time, "获取聊天记录");
+            }
             ctx.persist
                 .put_message(message::ActiveModel::from_inner_msg(&msg, source))
                 .await?;

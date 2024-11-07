@@ -17,7 +17,6 @@ use crate::{app::History, chat::ChatType, Context, PrintError, Runable};
 ///   1. join oldest-quit chat
 ///   2. fetch all history
 ///   3. set update time
-///   4. quit oldest-joined chat
 ///
 pub struct Sentence {}
 impl Sentence {
@@ -32,7 +31,7 @@ impl Runable for Sentence {
         "周期更新冷历史记录"
     }
     async fn run(&mut self, ctx: Context) -> Result<()> {
-        let mut ticker = tokio::time::interval(Duration::from_secs(10));
+        let mut ticker = tokio::time::interval(Duration::from_secs(300));
 
         loop {
             let result = tick(&mut ticker, ctx.clone()).await;
@@ -51,12 +50,12 @@ async fn tick(ticker: &mut Interval, ctx: Context) -> Result<()> {
     ctx.persist.sync_chat_joined(ctx.clone()).await?;
 
     // 1. join oldest-quit chat
-    let oldest_quit = ctx.persist.find_oldest_chat(Some(false)).await?;
+    let oldest_quit = ctx.persist.find_oldest_channel().await?;
     if oldest_quit.is_none() {
         return Ok(());
     }
     let oldest_quit = oldest_quit.unwrap();
-    warn!(oldest_quit.chat_id, "周期更新 >> 开始预热");
+    warn!(oldest_quit.chat_id, "周期更新 >> 加入冷频道");
     if oldest_quit.ty == ChatType::Channel {
         ctx.join_quited_chat(oldest_quit.chat_id).await.into_log();
     } else {
@@ -73,14 +72,6 @@ async fn tick(ticker: &mut Interval, ctx: Context) -> Result<()> {
     let mut chat = oldest_quit.into_active_model();
     chat.last_update = Set(Utc::now().naive_utc());
     chat.update(&ctx.persist.db).await?;
-
-    // 4. quit oldest-joined chat
-    if let Some(oldest_joined) = ctx.persist.find_oldest_chat(Some(true)).await? {
-        warn!(oldest_joined.chat_id, "周期更新 >> 弹出冷群");
-        ctx.quit_chat(oldest_joined.packed()?).await.into_log();
-    } else {
-        warn!("未能找到最老的已加入聊天");
-    }
 
     return Ok(());
 }

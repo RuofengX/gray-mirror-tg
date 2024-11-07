@@ -178,30 +178,29 @@ impl Database {
         }
     }
 
-    pub async fn find_oldest_chat(
-        &self,
-        joined: Option<bool>,
-    ) -> Result<Option<chat::Model>> {
-        let mut select = chat::Entity::find();
-        if let Some(j) = joined {
-            select = select.filter(chat::Column::Joined.eq(j));
-        };
-        let ret = select
+    pub async fn find_oldest_channel(&self) -> Result<Option<chat::Model>> {
+        let ret = chat::Entity::find()
+            .filter(chat::Column::Ty.eq("channel"))
             .order_by(chat::Column::LastUpdate, Order::Asc)
             .one(&self.db)
             .await?;
+
         Ok(ret)
     }
 
-    pub async fn find_latest_chat(
-        &self,
-        joined: Option<bool>,
-    ) -> Result<Option<chat::Model>> {
-        let mut select = chat::Entity::find();
-        if let Some(j) = joined {
-            select = select.filter(chat::Column::Joined.eq(j));
-        };
-        let ret = select
+    pub async fn find_latest_channel(&self) -> Result<Option<chat::Model>> {
+        let ret = chat::Entity::find()
+            .filter(chat::Column::Ty.eq("channel"))
+            .order_by(chat::Column::LastUpdate, Order::Desc)
+            .one(&self.db)
+            .await?;
+
+        Ok(ret)
+    }
+
+    pub async fn find_oldest_joined(&self) -> Result<Option<chat::Model>> {
+        let ret = chat::Entity::find()
+            .filter(chat::Column::Joined.eq(true))
             .order_by(chat::Column::LastUpdate, Order::Desc)
             .one(&self.db)
             .await?;

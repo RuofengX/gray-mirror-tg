@@ -238,7 +238,7 @@ impl Context {
                     info!("尝试退出聊天以腾出空间");
                     let chat = self
                         .persist
-                        .find_oldest_chat(Some(true))
+                        .find_oldest_joined()
                         .await
                         .ok_or_log()
                         .flatten()

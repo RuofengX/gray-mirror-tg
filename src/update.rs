@@ -100,13 +100,16 @@ pub trait Updater: Send + Sync + 'static {
 pub struct UpdateApp {
     parser: Vec<UpdateParser>,
     tx: broadcast::Sender<Update>,
+    #[allow(dead_code)] // 确保至少存在一个rx与tx，防止channel关闭
+    rx: broadcast::Receiver<Update>,
 }
 impl UpdateApp {
     pub fn new() -> Self {
-        let (tx, _) = broadcast::channel(2048);
+        let (tx, rx) = broadcast::channel(2048);
         Self {
             parser: Vec::new(),
             tx,
+            rx,
         }
     }
     pub fn add_parser(&mut self, parser: impl Updater) -> () {

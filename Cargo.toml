@@ -1,7 +1,10 @@
 [package]
 edition = "2021"
 name = "gray-mirror-tg"
-version = "0.4.3"
+version = "0.4.4"
+
+[features]
+grafana = []
 
 [dependencies]
 anyhow = "1.0.89"

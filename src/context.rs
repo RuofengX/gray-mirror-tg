@@ -13,7 +13,6 @@ use tokio::{
 };
 use tracing::{error, info, level_filters::STATIC_MAX_LEVEL, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use url::Url;
 
 use crate::{
     chat,
@@ -43,6 +42,7 @@ impl Deref for Context {
 
 impl Context {
     pub async fn new() -> Result<Self> {
+        #[cfg_attr(not(feature = "grafana"), allow(unused_mut))]
         let mut background_tasks = JoinSet::new();
 
         let logger = tracing_subscriber::registry();
@@ -53,15 +53,21 @@ impl Context {
             .with(tracing_subscriber::fmt::Layer::new());
 
         if loki_url != "" {
-            let (layer, task) = tracing_loki::builder()
-                .label("service_name", "gray-mirror-tg")?
-                .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
-                .build_url(Url::parse(&loki_url)?)?;
+            #[cfg(feature = "grafana")]
+            {
+                use url::Url;
+                let (layer, task) = tracing_loki::builder()
+                    .label("service_name", "gray-mirror-tg")?
+                    .label("version", std::env::var("CARGO_PKG_VERSION").unwrap())?
+                    .build_url(Url::parse(&loki_url)?)?;
 
-            background_tasks.spawn(async move {
-                task.await;
-            });
-            logger.with(layer).init();
+                background_tasks.spawn(async move {
+                    task.await;
+                });
+                logger.with(layer).init();
+            }
+            #[cfg(not(feature = "grafana"))]
+            logger.init();
         } else {
             logger.init();
         }
